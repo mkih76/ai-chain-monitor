@@ -1,0 +1,20 @@
+# Data & Logs
+data/*.db
+logs/*.log
+__pycache__/
+*.pyc
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+venv/
+*.egg-info/
+dist/
+build/

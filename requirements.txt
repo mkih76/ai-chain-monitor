@@ -1,0 +1,8 @@
+flask>=3.0
+flask-cors
+requests
+beautifulsoup4
+lxml
+apscheduler
+pysocks
+gunicorn
