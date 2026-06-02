@@ -95,6 +95,68 @@
     </div>
   </section>
 
+  <!-- Leading Indicators: Early Warning -->
+  <section>
+    <div class="container">
+      <div class="card" style="border-left:3px solid var(--warning);">
+        <div class="card__header">
+          <div class="card__title">
+            <div class="card__title-icon" style="background:var(--warning);"></div>
+            先行指标预警
+          </div>
+          <div class="card__subtitle">央视报道前的信号 · 多维度共振提升置信度</div>
+        </div>
+        <div class="card__body">
+          <div x-show="leading_loading" class="loading"><span class="spinner"></span>扫描先行指标...</div>
+
+          <!-- Resonance Alerts -->
+          <div x-show="!leading_loading && leading_resonances.length > 0" style="margin-bottom:16px;">
+            <div class="text-sm font-semibold" style="color:var(--warning); margin-bottom:8px;">
+              <i class="fa-solid fa-bolt"></i> 多信号共振板块
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:10px;">
+              <template x-for="r in leading_resonances" :key="r.sector">
+                <div style="padding:12px; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:var(--radius); border-left:3px solid var(--warning);">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <span class="font-semibold" x-text="r.sector"></span>
+                    <span class="badge" :class="r.confidence === 'high' ? 'badge--critical' : r.confidence === 'medium' ? 'badge--high' : 'badge--muted'"
+                          x-text="r.confidence === 'high' ? '高置信' : r.confidence === 'medium' ? '中置信' : '低置信'"></span>
+                  </div>
+                  <div class="text-sm text-muted" x-text="r.signal_count + '个信号来自' + r.source_count + '个来源: ' + r.sources.join('、')"></div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Individual Signals -->
+          <div x-show="!leading_loading && leading_signals.length > 0">
+            <div class="text-sm font-semibold text-muted" style="margin-bottom:8px;">
+              <i class="fa-solid fa-satellite-dish"></i> 先行信号
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; max-height:200px; overflow-y:auto;">
+              <template x-for="sig in leading_signals.slice(0, 12)" :key="sig.title">
+                <div style="display:flex; align-items:flex-start; gap:8px; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:var(--radius);">
+                  <div style="width:6px; height:6px; border-radius:50%; margin-top:6px; flex-shrink:0;"
+                       :style="'background:' + (sig.severity === 'critical' ? 'var(--down)' : sig.severity === 'high' ? 'var(--warning)' : 'var(--text-muted)')"></div>
+                  <div style="flex:1; min-width:0;">
+                    <div class="text-sm font-semibold" x-text="sig.title"></div>
+                    <div class="text-xs text-muted" x-text="sig.detail" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+                    <div class="text-xs" style="color:var(--accent); margin-top:2px;" x-text="sig.lead_time"></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div x-show="!leading_loading && leading_signals.length === 0" class="empty-state" style="padding:16px;">
+            <div class="empty-state__icon"><i class="fa-solid fa-satellite-dish"></i></div>
+            <div class="empty-state__text">暂无先行信号</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Main Grid: Heatmap + Signals -->
   <section>
     <div class="container">
@@ -258,6 +320,7 @@
 function dashboard() {
   return {
     loading: true,
+    leading_loading: true,
     sectors: {},
     overseas: [],
     upstream: {},
@@ -265,6 +328,8 @@ function dashboard() {
     inventory: {},
     recent_signals: [],
     recentNews: [],
+    leading_signals: [],
+    leading_resonances: [],
     calendarEvents: [
       {date: '2025-07-10', event: '台积电6月营收', impact: ['封测','光模块'], type: 'tsmc_revenue'},
       {date: '2025-07-17', event: '台积电Q2财报', impact: ['全产业链'], type: 'earnings'},
@@ -273,12 +338,23 @@ function dashboard() {
 
     async load() {
       try {
-        const [dashRes, newsRes] = await Promise.all([
+        const [dashRes, newsRes, leadingRes] = await Promise.all([
           fetch('/api/dashboard'),
-          fetch('/api/news?limit=10')
+          fetch('/api/news?limit=10'),
+          fetch('/api/leading-indicators')
         ]);
         const d = await dashRes.json();
         const news = await newsRes.json();
+
+        // Leading indicators (async, don't block)
+        try {
+          const leading = await leadingRes.json();
+          this.leading_signals = leading.signals || [];
+          this.leading_resonances = leading.resonances || [];
+        } catch (e) {
+          console.error('Leading indicators error:', e);
+        }
+        this.leading_loading = false;
 
         this.sectors = d.sectors || {};
         this.overseas = d.overseas || [];

@@ -197,6 +197,17 @@ def api_discoveries():
     discoveries = get_pending_discoveries()
     return jsonify(discoveries)
 
+@app.route("/api/leading-indicators")
+def api_leading_indicators():
+    """先行指标数据"""
+    from db import init_db
+    from collectors.leading_collector import collect_all_leading_indicators
+    from analyzers.leading_engine import run_leading_analysis
+    init_db()
+    raw = collect_all_leading_indicators()
+    result = run_leading_analysis(raw)
+    return jsonify(result)
+
 @app.route("/api/dashboard")
 def api_dashboard():
     """仪表盘汇总数据"""

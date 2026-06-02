@@ -69,6 +69,9 @@ def job_afternoon_full():
 
         # 运行回测校准
         _run_backtest()
+
+        # 先行指标采集+分析
+        _run_leading_indicators()
     except Exception as e:
         print(f"  ✗ 完整运行失败: {e}")
 
@@ -143,6 +146,19 @@ def _run_backtest():
             print(f"  回测: {correct}/{total} 预测正确 ({correct/total*100:.0f}%)")
     except Exception as e:
         print(f"  ⚠ 回测失败: {e}")
+
+def _run_leading_indicators():
+    """运行先行指标采集和分析"""
+    try:
+        from collectors.leading_collector import collect_all_leading_indicators
+        from analyzers.leading_engine import run_leading_analysis
+        raw = collect_all_leading_indicators()
+        result = run_leading_analysis(raw)
+        high_count = result["summary"].get("high_signals", 0)
+        resonance_count = result["summary"].get("resonances", 0)
+        print(f"  先行指标: {high_count}个高优信号, {resonance_count}个共振板块")
+    except Exception as e:
+        print(f"  ⚠ 先行指标失败: {e}")
 
 def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
