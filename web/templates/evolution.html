@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block title %}系统进化 — AI产业链监控{% endblock %}
+
+{% block content %}
+<div x-data="evolutionPage()" x-init="load()">
+
+  <!-- Prediction Stats -->
+  <section style="padding:16px 0;">
+    <div class="container">
+      <div class="card">
+        <div class="card__header">
+          <div class="card__title">
+            <div class="card__title-icon" style="background:#059669;"></div>
+            预测回测统计
+          </div>
+          <div class="card__subtitle">AI预测 vs 实际涨跌 · 自动校准信号阈值</div>
+        </div>
+        <div class="card__body">
+          <div x-show="loading" class="loading"><span class="spinner"></span>加载中...</div>
+
+          <div x-show="!loading && stats">
+            <!-- Stats Row -->
+            <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px;">
+              <div style="padding:16px; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:var(--radius); text-align:center;">
+                <div class="text-sm text-muted" style="margin-bottom:4px;">已回测</div>
+                <div class="mono font-bold" style="font-size:28px; color:var(--text-primary);" x-text="stats.total_checked || 0"></div>
+              </div>
+              <div style="padding:16px; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:var(--radius); text-align:center;">
+                <div class="text-sm text-muted" style="margin-bottom:4px;">预测正确</div>
+                <div class="mono font-bold" style="font-size:28px; color:var(--up);" x-text="stats.correct || 0"></div>
+              </div>
+              <div style="padding:16px; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:var(--radius); text-align:center;">
+                <div class="text-sm text-muted" style="margin-bottom:4px;">准确率</div>
+                <div class="mono font-bold" style="font-size:28px;"
+                     :class="stats.accuracy >= 60 ? 'text-up' : stats.accuracy >= 40 ? 'text-warning' : 'text-down'"
+                     x-text="(stats.accuracy || 0) + '%'"></div>
+              </div>
+              <div style="padding:16px; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:var(--radius); text-align:center;">
+                <div class="text-sm text-muted" style="margin-bottom:4px;">待回测</div>
+                <div class="mono font-bold" style="font-size:28px; color:var(--accent);" x-text="stats.unchecked || 0"></div>
+              </div>
+            </div>
+
+            <!-- Accuracy Bar -->
+            <div x-show="stats.total_checked > 0" style="margin-bottom:20px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span class="text-sm font-semibold">整体准确率</span>
+                <span class="mono text-sm" x-text="(stats.accuracy || 0) + '%'"></span>
+              </div>
+              <div style="height:8px; background:var(--bg-tertiary); border-radius:4px; overflow:hidden;">
+                <div style="height:100%; border-radius:4px; transition:width 0.6s ease;"
+                     :style="'width:' + (stats.accuracy || 0) + '%; background:' + (stats.accuracy >= 60 ? 'var(--up)' : stats.accuracy >= 40 ? '#eab308' : 'var(--down)')"></div>
+              </div>
+            </div>
+          </div>
+
+          <div x-show="!loading && !stats" class="empty-state">
+            <div class="empty-state__icon">📊</div>
+            <div class="empty-state__text">暂无预测数据</div>
+            <div class="text-sm text-muted" style="margin-top:8px;">系统运行后会自动记录AI预测并回测验证</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Recent Predictions -->
+  <section style="padding:0 0 16px;">
+    <div class="container">
+      <div class="card">
+        <div class="card__header">
+          <div class="card__title">
+            <div class="card__title-icon" style="background:var(--accent);"></div>
+            近期预测记录
+          </div>
+          <div class="card__subtitle" x-text="(stats.recent || []).length + '条'"></div>
+        </div>
+        <div class="card__body card__body--flush">
+          <div style="max-height:400px; overflow-y:auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>标的</th>
+                  <th>预测方向</th>
+                  <th>置信度</th>
+                  <th>实际结果</th>
+                  <th>涨跌幅</th>
+                  <th>判定</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="p in (stats.recent || [])" :key="p.id">
+                  <tr>
+                    <td class="mono text-muted" x-text="p.timestamp ? p.timestamp.substring(5, 16) : ''"></td>
+                    <td class="font-semibold" x-text="p.target"></td>
+                    <td>
+                      <span :class="p.direction === 'bullish' ? 'text-up' : p.direction === 'bearish' ? 'text-down' : 'text-muted'"
+                            x-text="p.direction === 'bullish' ? '偏多' : p.direction === 'bearish' ? '偏空' : '中性'"></span>
+                    </td>
+                    <td>
+                      <span class="badge"
+                            :class="p.confidence === 'high' ? 'badge--high' : p.confidence === 'medium' ? 'badge--medium' : 'badge--muted'"
+                            x-text="p.confidence === 'high' ? '高' : p.confidence === 'medium' ? '中' : '低'"></span>
+                    </td>
+                    <td>
+                      <span x-show="p.checked"
+                            :class="p.actual_direction === 'bullish' ? 'text-up' : p.actual_direction === 'bearish' ? 'text-down' : 'text-muted'"
+                            x-text="p.actual_direction === 'bullish' ? '偏多' : p.actual_direction === 'bearish' ? '偏空' : '中性'"></span>
+                      <span x-show="!p.checked" class="text-muted">-</span>
+                    </td>
+                    <td class="mono"
+                        :class="(p.actual_change_pct || 0) > 0 ? 'text-up' : (p.actual_change_pct || 0) < 0 ? 'text-down' : 'text-muted'"
+                        x-text="p.checked ? ((p.actual_change_pct > 0 ? '+' : '') + (p.actual_change_pct || 0) + '%') : '-'"></td>
+                    <td>
+                      <span x-show="p.checked" :class="p.correct ? 'text-up' : 'text-down'" style="font-weight:700;"
+                            x-text="p.correct ? '✓' : '✗'"></span>
+                      <span x-show="!p.checked" class="text-muted" style="font-size:12px;">待回测</span>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+            <div x-show="!stats.recent || stats.recent.length === 0" class="empty-state">
+              <div class="empty-state__text">暂无预测记录</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Calibration History -->
+  <section style="padding:0 0 16px;">
+    <div class="container">
+      <div class="card">
+        <div class="card__header">
+          <div class="card__title">
+            <div class="card__title-icon" style="background:#eab308;"></div>
+            自动校准记录
+          </div>
+          <div class="card__subtitle" x-text="calibrations.length + '条校准'"></div>
+        </div>
+        <div class="card__body card__body--flush">
+          <div x-show="calibrations.length === 0" class="empty-state" style="padding:24px;">
+            <div class="empty-state__icon">⚙️</div>
+            <div class="empty-state__text">暂无校准记录</div>
+            <div class="text-sm text-muted" style="margin-top:8px;">每周日自动回测后，系统会根据准确率自动调整阈值</div>
+          </div>
+          <div x-show="calibrations.length > 0" style="max-height:300px; overflow-y:auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>参数</th>
+                  <th>旧值</th>
+                  <th>新值</th>
+                  <th>原因</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="c in calibrations" :key="c.id">
+                  <tr>
+                    <td class="mono text-muted" x-text="c.timestamp ? c.timestamp.substring(5, 16) : ''"></td>
+                    <td class="font-semibold" x-text="c.param_name"></td>
+                    <td class="mono text-muted" x-text="c.old_value"></td>
+                    <td class="mono text-accent" x-text="c.new_value"></td>
+                    <td class="text-sm text-muted" style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                        x-text="c.reason"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Discoveries -->
+  <section style="padding:0 0 24px;">
+    <div class="container">
+      <div class="card">
+        <div class="card__header">
+          <div class="card__title">
+            <div class="card__title-icon" style="background:#a371f7;"></div>
+            自动发现新标的
+          </div>
+          <div class="card__subtitle">从新闻高频词中发现潜在AI产业链标的</div>
+        </div>
+        <div class="card__body card__body--flush">
+          <div x-show="discoveries.length === 0" class="empty-state" style="padding:24px;">
+            <div class="empty-state__icon">🔍</div>
+            <div class="empty-state__text">暂无新发现</div>
+            <div class="text-sm text-muted" style="margin-top:8px;">每晚21:00自动扫描新闻，发现新标的后显示在此</div>
+          </div>
+          <div x-show="discoveries.length > 0" style="max-height:400px; overflow-y:auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>优先级</th>
+                  <th>名称</th>
+                  <th>代码</th>
+                  <th>板块</th>
+                  <th>提及次数</th>
+                  <th>理由</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="d in discoveries" :key="d.id">
+                  <tr>
+                    <td>
+                      <span class="badge"
+                            :class="d.priority === 'high' ? 'badge--critical' : d.priority === 'medium' ? 'badge--high' : 'badge--muted'"
+                            x-text="d.priority === 'high' ? '高' : d.priority === 'medium' ? '中' : '低'"></span>
+                    </td>
+                    <td class="font-semibold" x-text="d.name"></td>
+                    <td class="mono text-muted" x-text="d.code"></td>
+                    <td class="text-sm" x-text="d.sector"></td>
+                    <td class="mono" x-text="d.mentions + '次'"></td>
+                    <td class="text-sm text-muted" style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                        x-text="d.reason"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function evolutionPage() {
+  return {
+    loading: true,
+    stats: null,
+    calibrations: [],
+    discoveries: [],
+
+    async load() {
+      try {
+        const [predRes, discRes] = await Promise.all([
+          fetch('/api/predictions'),
+          fetch('/api/discoveries'),
+        ]);
+        const predData = await predRes.json();
+        const discData = await discRes.json();
+
+        this.stats = predData.stats || null;
+        this.calibrations = predData.calibrations || [];
+        this.discoveries = discData || [];
+      } catch (e) {
+        console.error('Evolution load error:', e);
+      } finally {
+        this.loading = false;
+      }
+    }
+  };
+}
+</script>
+{% endblock %}

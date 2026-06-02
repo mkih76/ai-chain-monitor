@@ -27,6 +27,10 @@ def news_page():
 def analysis_page():
     return render_template("analysis.html")
 
+@app.route("/evolution")
+def evolution_page():
+    return render_template("evolution.html")
+
 @app.route("/stock/<code>")
 def stock_detail(code):
     return render_template("stock.html", code=code)
@@ -173,6 +177,25 @@ def api_ai_analysis():
     init_db()
     result = get_ai_analysis_recent(limit=20)
     return jsonify(result)
+
+@app.route("/api/predictions")
+def api_predictions():
+    """预测统计"""
+    from db import init_db
+    from predictor import get_prediction_stats, get_calibration_history
+    init_db()
+    stats = get_prediction_stats()
+    calibrations = get_calibration_history(limit=10)
+    return jsonify({"stats": stats, "calibrations": calibrations})
+
+@app.route("/api/discoveries")
+def api_discoveries():
+    """发现的新标的"""
+    from db import init_db
+    from discoverer import get_pending_discoveries
+    init_db()
+    discoveries = get_pending_discoveries()
+    return jsonify(discoveries)
 
 @app.route("/api/dashboard")
 def api_dashboard():
