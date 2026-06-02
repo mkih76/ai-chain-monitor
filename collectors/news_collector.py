@@ -74,6 +74,7 @@ def fetch_sina_finance_news():
                     date_str = datetime.fromtimestamp(int(ctime)).strftime("%Y-%m-%d %H:%M") if ctime else ""
                     news = {
                         "source": "sina_finance",
+                        "category": "财经快讯",
                         "title": title,
                         "url": item.get("url", ""),
                         "keywords": ",".join(matches),
@@ -140,6 +141,7 @@ def fetch_cls_telegraph():
                     score = len(matched) * 5
                     results.append({
                         "source": "cls_telegraph",
+                        "category": "财联社",
                         "title": title,
                         "url": f"https://www.cls.cn/detail/{item.get('id', '')}",
                         "keywords": ",".join(matched),
@@ -198,6 +200,7 @@ def fetch_cninfo_announcements():
                     if any(kw in title for kw in important_keywords):
                         results.append({
                             "source": "cninfo",
+                            "category": "公司公告",
                             "title": f"[{name}] {title}",
                             "url": ann_url,
                             "keywords": name,
@@ -270,13 +273,13 @@ def ai_analyze_news(news_list):
                             batch[i]["relevance"] = "high"
                         elif analysis.get("confidence") == "medium":
                             batch[i]["score"] = max(batch[i].get("score", 0), 7)
-                print(f"  ✓ AI分析完成: {len(analyses)}条新闻")
+                print(f"  [OK] AI分析完成: {len(analyses)}条新闻")
             else:
-                print("  ⚠ AI返回格式解析失败，保留关键词打分")
+                print("  [WARN] AI返回格式解析失败，保留关键词打分")
         else:
-            print("  ⚠ AI分析无响应，保留关键词打分")
+            print("  [WARN] AI分析无响应，保留关键词打分")
     except Exception as e:
-        print(f"  ⚠ AI分析异常: {e}，保留关键词打分")
+        print(f"  [WARN] AI分析异常: {e}，保留关键词打分")
 
     return news_list
 
@@ -362,16 +365,84 @@ def _scan_text(text):
     return matches, score
 
 def save_news_to_db(news_list):
-    """将新闻存入数据库"""
+    """将新闻存入数据库（含AI分析结果）"""
     conn = get_conn()
     for n in news_list:
         conn.execute(
-            "INSERT INTO news (timestamp, source, title, url, keywords, relevance) VALUES (?,?,?,?,?,?)",
-            (n.get("date", datetime.now().isoformat()), n["source"], n["title"],
-             n.get("url", ""), n.get("keywords", ""), n.get("relevance", "medium"))
+            """INSERT INTO news
+               (timestamp, source, category, title, content, url, keywords, relevance,
+                ai_direction, ai_confidence, ai_reason, affected_sectors)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (n.get("date", datetime.now().isoformat()), n["source"],
+             n.get("category", "财经快讯"), n["title"],
+             n.get("content", ""), n.get("url", ""),
+             n.get("keywords", ""), n.get("relevance", "medium"),
+             n.get("ai_direction", ""), n.get("ai_confidence", ""),
+             n.get("ai_reason", ""), n.get("ai_affected", ""))
         )
     conn.commit()
     conn.close()
+
+# ============================================================
+# 4. 券商研报 (东方财富研报API)
+# ============================================================
+def fetch_research_reports():
+    """从东方财富抓取券商研报（AI产业链相关）"""
+    results = []
+    ai_keywords = ["AI", "人工智能", "算力", "芯片", "半导体", "光模块", "数据中心",
+                   "服务器", "封装", "存储", "GPU", "HBM", "液冷", "铜缆", "PCB"]
+
+    try:
+        url = "https://reportapi.eastmoney.com/report/list"
+        params = {
+            "industryCode": "*",
+            "pageSize": 30,
+            "industry": "*",
+            "rating": "*",
+            "ratingChange": "*",
+            "beginTime": "",
+            "endTime": "",
+            "pageNo": 1,
+            "fields": "",
+            "qType": 0,
+            "orgCode": "",
+            "rcode": "",
+            "p": 1,
+            "pageNum": 1,
+        }
+        r = requests.get(url, params=params, headers=HEADERS, timeout=15)
+        if r.status_code == 200:
+            data = r.json()
+            reports = data.get("data", []) or []
+            for rep in reports:
+                title = rep.get("title", "")
+                # 只保留AI产业链相关研报
+                matched = [kw for kw in ai_keywords if kw in title]
+                if not matched:
+                    continue
+
+                org_name = rep.get("orgSName", "")
+                date_str = rep.get("publishDate", "")[:10]
+                stock_name = rep.get("stockName", "")
+                stock_code = rep.get("stockCode", "")
+                info_code = rep.get("infoCode", "")
+
+                results.append({
+                    "source": "research_report",
+                    "category": "券商研报",
+                    "title": f"[{org_name}] {title}",
+                    "url": f"https://data.eastmoney.com/report/info/{info_code}.html" if info_code else "",
+                    "keywords": ",".join(matched),
+                    "score": 7,
+                    "relevance": "medium",
+                    "date": date_str,
+                    "content": f"标的: {stock_name}({stock_code})" if stock_name else "",
+                })
+    except Exception as e:
+        print(f"  [WARN] 券商研报抓取失败: {e}")
+
+    return results
+
 
 # ============================================================
 # 综合采集
@@ -384,18 +455,23 @@ def collect_news():
     # 新浪财经快讯 (替代失效的东方财富搜索API)
     sina_news = fetch_sina_finance_news()
     all_news.extend(sina_news)
-    print(f"  ✓ 新浪财经: {len(sina_news)}条相关")
+    print(f"  [OK] 新浪财经: {len(sina_news)}条相关")
     time.sleep(1)
 
     # 财联社电报
     cls_news = fetch_cls_telegraph()
     all_news.extend(cls_news)
-    print(f"  ✓ 财联社: {len(cls_news)}条相关")
+    print(f"  [OK] 财联社: {len(cls_news)}条相关")
     time.sleep(1)
 
     # 巨潮公告
     cn_news = fetch_cninfo_announcements()
     all_news.extend(cn_news)
+
+    # 券商研报
+    report_news = fetch_research_reports()
+    all_news.extend(report_news)
+    print(f"  [OK] 券商研报: {len(report_news)}条相关")
 
     # 去重
     seen_titles = set()

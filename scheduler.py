@@ -72,6 +72,9 @@ def job_afternoon_full():
 
         # 先行指标采集+分析
         _run_leading_indicators()
+
+        # 材料价格采集
+        _run_material_collection()
     except Exception as e:
         print(f"  ✗ 完整运行失败: {e}")
 
@@ -159,6 +162,15 @@ def _run_leading_indicators():
         print(f"  先行指标: {high_count}个高优信号, {resonance_count}个共振板块")
     except Exception as e:
         print(f"  ⚠ 先行指标失败: {e}")
+
+def _run_material_collection():
+    """运行材料价格采集"""
+    try:
+        from collectors.material_collector import collect_all_materials
+        results = collect_all_materials()
+        print(f"  材料价格: 采集{len(results)}种材料")
+    except Exception as e:
+        print(f"  ⚠ 材料价格采集失败: {e}")
 
 def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")

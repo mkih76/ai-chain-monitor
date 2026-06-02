@@ -3,58 +3,211 @@
 {% block title %}消息 — AI产业链监控{% endblock %}
 
 {% block content %}
+<style>
+.filter-tab--sm {
+  padding: 3px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.filter-tab--sm:hover { border-color: var(--accent); color: var(--text-primary); }
+.filter-tab--sm.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.news-item__reason { margin-top: 4px; }
+</style>
 <div x-data="newsPage()" x-init="load()">
 
-  <section style="padding:16px 0 24px;">
+  <!-- 筛选栏 -->
+  <section style="padding:16px 0 8px;">
     <div class="container">
-      <div class="card">
+      <div class="card" style="padding:12px 16px;">
+        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+          <!-- 分类筛选 -->
+          <div class="filter-tabs">
+            <button class="filter-tab" :class="category==='all' && 'active'" @click="category='all'; loadNews()">
+              <i class="fa-solid fa-layer-group"></i> 全部
+            </button>
+            <button class="filter-tab" :class="category==='财联社' && 'active'" @click="category='财联社'; loadNews()">
+              <i class="fa-solid fa-bolt"></i> 财联社
+            </button>
+            <button class="filter-tab" :class="category==='财经快讯' && 'active'" @click="category='财经快讯'; loadNews()">
+              <i class="fa-solid fa-newspaper"></i> 财经快讯
+            </button>
+            <button class="filter-tab" :class="category==='券商研报' && 'active'" @click="category='券商研报'; loadNews()">
+              <i class="fa-solid fa-chart-line"></i> 券商研报
+            </button>
+            <button class="filter-tab" :class="category==='公司公告' && 'active'" @click="category='公司公告'; loadNews()">
+              <i class="fa-solid fa-file-lines"></i> 公司公告
+            </button>
+            <button class="filter-tab" :class="category==='材料' && 'active'" @click="category='材料'; loadNews()">
+              <i class="fa-solid fa-cubes"></i> 材料供需
+            </button>
+          </div>
+
+          <!-- AI研判筛选 -->
+          <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+            <span style="font-size:12px; color:var(--text-secondary);">AI研判:</span>
+            <button class="filter-tab filter-tab--sm" :class="direction==='all' && 'active'" @click="direction='all'; loadNews()">全部</button>
+            <button class="filter-tab filter-tab--sm" :class="direction==='bullish' && 'active'" @click="direction='bullish'; loadNews()">
+              <span style="color:var(--up);">偏多</span>
+            </button>
+            <button class="filter-tab filter-tab--sm" :class="direction==='bearish' && 'active'" @click="direction='bearish'; loadNews()">
+              <span style="color:var(--down);">偏空</span>
+            </button>
+          </div>
+
+          <button class="btn" @click="load()" style="flex-shrink:0;">
+            <i class="fa-solid fa-rotate" style="font-size:10px;"></i> 刷新
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI研判总结 -->
+  <section style="padding:0 0 16px;">
+    <div class="container">
+      <div class="card" style="border-left:3px solid var(--accent); background:linear-gradient(135deg, rgba(0,122,255,0.05), transparent);">
         <div class="card__header">
           <div class="card__title">
             <div class="card__title-icon" style="background:var(--accent);"></div>
-            行业新闻
+            AI研判总结
           </div>
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div class="filter-tabs">
-              <button class="filter-tab" :class="filter==='all' && 'active'" @click="filter='all'">全部</button>
-              <button class="filter-tab" :class="filter==='cls' && 'active'" @click="filter='cls'">财联社</button>
-              <button class="filter-tab" :class="filter==='eastmoney' && 'active'" @click="filter='eastmoney'">东方财富</button>
-              <button class="filter-tab" :class="filter==='cninfo' && 'active'" @click="filter='cninfo'">公告</button>
-            </div>
-            <button class="btn" @click="load()">
-              <i class="fa-solid fa-rotate" style="font-size:10px;"></i> 刷新
-            </button>
-          </div>
+          <span class="badge" :class="summary.overall==='偏多' ? 'badge--up' : summary.overall==='偏空' ? 'badge--down' : 'badge--muted'"
+                x-text="summary.overall || '加载中'"></span>
         </div>
-        <div class="card__body card__body--flush">
-          <div x-show="loading" class="loading"><span class="spinner"></span>加载中...</div>
-
-          <div x-show="!loading" style="max-height:600px; overflow-y:auto;">
-            <template x-for="item in filteredNews" :key="item.id">
-              <div class="news-item animate-in">
-                <div style="flex:1; min-width:0;">
-                  <div class="news-item__badges">
-                    <span class="badge badge--accent"
-                          x-text="item.source === 'cls_telegraph' ? '财联社' : item.source === 'cninfo' ? '公告' : '东方财富'"></span>
-                    <span class="badge" :class="item.relevance === 'high' ? 'badge--warning' : 'badge--muted'"
-                          x-text="item.relevance === 'high' ? '高相关' : '中相关'"></span>
-                    <span x-show="item.ai_direction" class="badge"
-                          :class="item.ai_direction === 'bullish' ? 'badge--up' : item.ai_direction === 'bearish' ? 'badge--down' : 'badge--muted'"
-                          x-text="item.ai_direction === 'bullish' ? '利好' : item.ai_direction === 'bearish' ? '利空' : '中性'"></span>
-                  </div>
-                  <a :href="item.url || '#'" target="_blank" class="news-item__title" x-text="item.title"></a>
-                  <div x-show="item.ai_reason" class="news-item__reason" x-text="item.ai_reason"></div>
-                </div>
-                <div class="news-item__time" x-text="item.date || ''"></div>
-              </div>
-            </template>
-
-            <div x-show="filteredNews.length === 0" class="empty-state">
-              <div class="empty-state__icon"><i class="fa-solid fa-newspaper"></i></div>
-              <div class="empty-state__text">暂无相关新闻</div>
+        <div class="card__body" style="display:flex; gap:24px; align-items:center; flex-wrap:wrap;">
+          <div style="flex:1; min-width:200px;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+              <div style="font-size:28px; font-weight:700;" :style="summary.bullish_pct > 50 ? 'color:var(--up)' : summary.bullish_pct < 50 ? 'color:var(--down)' : 'color:var(--text-secondary)'"
+                   x-text="summary.bullish_pct + '%'"></div>
+              <div style="font-size:12px; color:var(--text-secondary);">偏多占比</div>
+            </div>
+            <div style="height:6px; background:var(--border); border-radius:3px; overflow:hidden;">
+              <div style="height:100%; border-radius:3px; transition:width 0.5s;"
+                   :style="`width:${summary.bullish_pct}%; background:${summary.bullish_pct > 50 ? 'var(--up)' : 'var(--down)'}`"></div>
+            </div>
+          </div>
+          <div style="display:flex; gap:16px; font-size:13px;">
+            <div style="text-align:center;">
+              <div style="font-size:20px; font-weight:600; color:var(--up);" x-text="summary.bullish_count"></div>
+              <div style="color:var(--text-secondary);">偏多</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:20px; font-weight:600; color:var(--down);" x-text="summary.bearish_count"></div>
+              <div style="color:var(--text-secondary);">偏空</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:20px; font-weight:600; color:var(--text-secondary);" x-text="summary.total_analyzed"></div>
+              <div style="color:var(--text-secondary);">已分析</div>
             </div>
           </div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- 材料供需板块 -->
+  <section x-show="category==='all' || category==='材料'" style="padding:0 0 16px;">
+    <div class="container">
+      <div class="card">
+        <div class="card__header">
+          <div class="card__title">
+            <div class="card__title-icon" style="background:#f59e0b;"></div>
+            材料供需
+          </div>
+          <span class="badge badge--muted" x-text="materials.length + '种'"></span>
+        </div>
+        <div class="card__body">
+          <div x-show="materials.length === 0" style="padding:16px; text-align:center; color:var(--text-secondary); font-size:13px;">
+            暂无材料数据，请先运行采集
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:12px;">
+            <template x-for="m in materials" :key="m.material">
+              <div class="card" style="padding:14px; border:1px solid var(--border);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                  <div style="font-size:15px; font-weight:600;" x-text="m.material === 'copper' ? '铜' : m.material === 'tin' ? '锡' : m.material === 'nickel' ? '镍' : m.material === 'aluminum' ? '铝' : m.material"></div>
+                  <span class="badge" :class="m.change_pct >= 0 ? 'badge--up' : 'badge--down'" x-text="(m.change_pct >= 0 ? '+' : '') + m.change_pct + '%'"></span>
+                </div>
+                <div style="display:flex; gap:16px; margin-bottom:10px;">
+                  <div>
+                    <div style="font-size:20px; font-weight:700;" x-text="m.price ? m.price.toLocaleString() : '-'"></div>
+                    <div style="font-size:11px; color:var(--text-secondary);" x-text="m.unit || '元/吨'"></div>
+                  </div>
+                  <div x-show="m.stockpile">
+                    <div style="font-size:14px; font-weight:500;" x-text="m.stockpile ? m.stockpile.toLocaleString() : '-'"></div>
+                    <div style="font-size:11px; color:var(--text-secondary);">
+                      库存 <span :style="m.stockpile_change_pct >= 0 ? 'color:var(--up)' : 'color:var(--down)'"
+                                x-text="(m.stockpile_change_pct >= 0 ? '+' : '') + (m.stockpile_change_pct || 0) + '%'"></span>
+                    </div>
+                  </div>
+                </div>
+                <div x-show="m.ai_impact" style="font-size:12px; color:var(--text-secondary); border-top:1px solid var(--border); padding-top:8px; line-height:1.5;">
+                  <span x-text="parseImpact(m.ai_impact).reason"></span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 新闻列表 -->
+  <section x-show="category !== '材料'" style="padding:0 0 24px;">
+    <div class="container">
+      <!-- 按分类分组展示 -->
+      <template x-for="cat in displayedCategories" :key="cat">
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card__header">
+            <div class="card__title">
+              <div class="card__title-icon" :style="`background:${categoryColor(cat)}`"></div>
+              <span x-text="cat"></span>
+            </div>
+            <span class="badge badge--muted" x-text="newsByCategory(cat).length + '条'"></span>
+          </div>
+          <div class="card__body card__body--flush">
+            <div style="max-height:500px; overflow-y:auto;">
+              <template x-for="item in newsByCategory(cat)" :key="item.id">
+                <div class="news-item animate-in">
+                  <div style="flex:1; min-width:0;">
+                    <div class="news-item__badges">
+                      <span class="badge" :class="item.relevance === 'high' ? 'badge--warning' : 'badge--muted'"
+                            x-text="item.relevance === 'high' ? '高相关' : '中相关'"></span>
+                      <span x-show="item.ai_direction" class="badge"
+                            :class="item.ai_direction === 'bullish' ? 'badge--up' : item.ai_direction === 'bearish' ? 'badge--down' : 'badge--muted'"
+                            x-text="item.ai_direction === 'bullish' ? '偏多' : item.ai_direction === 'bearish' ? '偏空' : '中性'"></span>
+                      <span x-show="item.ai_confidence" class="badge badge--muted"
+                            x-text="item.ai_confidence === 'high' ? '高置信' : item.ai_confidence === 'medium' ? '中置信' : '低置信'"></span>
+                    </div>
+                    <a :href="item.url || '#'" target="_blank" class="news-item__title" x-text="item.title"
+                       style="text-decoration:none; color:var(--text-primary); cursor:pointer;"></a>
+                    <div x-show="item.ai_reason" class="news-item__reason" style="margin-top:4px; font-size:12px; color:var(--text-secondary); line-height:1.5;">
+                      <i class="fa-solid fa-robot" style="color:var(--accent); margin-right:4px;"></i>
+                      <span x-text="item.ai_reason"></span>
+                    </div>
+                  </div>
+                  <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
+                    <div class="news-item__time" x-text="item.date || ''"></div>
+                    <a x-show="item.url" :href="item.url" target="_blank" style="font-size:11px; color:var(--accent); text-decoration:none;">
+                      <i class="fa-solid fa-arrow-up-right-from-square"></i> 原文
+                    </a>
+                  </div>
+                </div>
+              </template>
+
+              <div x-show="newsByCategory(cat).length === 0" class="empty-state" style="padding:24px;">
+                <div class="empty-state__text">暂无{{ cat }}相关新闻</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <div x-show="loading" class="loading" style="padding:40px;"><span class="spinner"></span>加载中...</div>
     </div>
   </section>
 
@@ -67,22 +220,81 @@ function newsPage() {
   return {
     loading: true,
     news: [],
-    filter: 'all',
+    materials: [],
+    summary: { overall: '加载中', bullish_pct: 50, bullish_count: 0, bearish_count: 0, total_analyzed: 0 },
+    category: 'all',
+    direction: 'all',
 
-    get filteredNews() {
-      if (this.filter === 'all') return this.news;
-      return this.news.filter(n => n.source === this.filter || n.source === this.filter + '_telegraph');
+    categoryColor(cat) {
+      const map = {
+        '财联社': '#ef4444',
+        '财经快讯': '#3b82f6',
+        '券商研报': '#8b5cf6',
+        '公司公告': '#10b981',
+        '材料': '#f59e0b',
+      };
+      return map[cat] || '#6b7280';
+    },
+
+    get displayedCategories() {
+      if (this.category !== 'all') return [this.category];
+      // 按数量排序
+      const cats = ['财联社', '财经快讯', '券商研报', '公司公告'];
+      return cats.filter(c => this.newsByCategory(c).length > 0);
+    },
+
+    newsByCategory(cat) {
+      let items = this.news.filter(n => n.category === cat);
+      if (this.direction !== 'all') {
+        items = items.filter(n => n.ai_direction === this.direction);
+      }
+      return items;
+    },
+
+    parseImpact(jsonStr) {
+      try {
+        return typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr || {};
+      } catch(e) { return {}; }
     },
 
     async load() {
       this.loading = true;
+      await Promise.all([this.loadNews(), this.loadMaterials(), this.loadSummary()]);
+      this.loading = false;
+    },
+
+    async loadNews() {
       try {
-        const r = await fetch('/api/news?limit=50');
+        let url = '/api/news?limit=80';
+        if (this.category !== 'all' && this.category !== '材料') {
+          url += '&category=' + encodeURIComponent(this.category);
+        }
+        if (this.direction !== 'all') {
+          url += '&direction=' + this.direction;
+        }
+        const r = await fetch(url);
         this.news = await r.json();
       } catch (e) {
         console.error('News load error:', e);
       }
-      this.loading = false;
+    },
+
+    async loadMaterials() {
+      try {
+        const r = await fetch('/api/materials');
+        this.materials = await r.json();
+      } catch (e) {
+        console.error('Materials load error:', e);
+      }
+    },
+
+    async loadSummary() {
+      try {
+        const r = await fetch('/api/news/summary');
+        this.summary = await r.json();
+      } catch (e) {
+        console.error('Summary load error:', e);
+      }
     }
   };
 }

@@ -150,14 +150,98 @@ def api_upstream():
 
 @app.route("/api/news")
 def api_news():
-    """新闻列表"""
+    """新闻列表（支持分类/方向/时间过滤）"""
     from db import init_db, get_conn
     init_db()
-    limit = int(__import__("flask").request.args.get("limit", 30))
+    req = __import__("flask").request
+    limit = int(req.args.get("limit", 50))
+    category = req.args.get("category", "")
+    direction = req.args.get("direction", "")
+    time_filter = req.args.get("time", "")
+
     conn = get_conn()
-    rows = conn.execute("SELECT * FROM news ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    sql = "SELECT * FROM news WHERE 1=1"
+    params = []
+
+    if category:
+        sql += " AND category=?"
+        params.append(category)
+    if direction:
+        sql += " AND ai_direction=?"
+        params.append(direction)
+    if time_filter == "today":
+        sql += " AND timestamp >= date('now', 'start of day')"
+    elif time_filter == "week":
+        sql += " AND timestamp >= date('now', '-7 days')"
+
+    sql += " ORDER BY id DESC LIMIT ?"
+    params.append(limit)
+    rows = conn.execute(sql, params).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/news/categories")
+def api_news_categories():
+    """新闻分类统计"""
+    from db import init_db, get_conn
+    init_db()
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT category, COUNT(*) as cnt FROM news GROUP BY category ORDER BY cnt DESC"
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/materials")
+def api_materials():
+    """材料价格数据"""
+    from db import init_db, get_latest_materials
+    init_db()
+    materials = get_latest_materials()
+    return jsonify(materials)
+
+
+@app.route("/api/news/summary")
+def api_news_summary():
+    """AI研判总结"""
+    from db import init_db, get_conn
+    init_db()
+    conn = get_conn()
+    # 统计最近新闻的AI方向分布
+    rows = conn.execute(
+        """SELECT ai_direction, COUNT(*) as cnt
+           FROM news WHERE ai_direction != '' AND ai_direction IS NOT NULL
+           AND timestamp >= date('now', '-7 days')
+           GROUP BY ai_direction"""
+    ).fetchall()
+    conn.close()
+
+    direction_counts = {r["ai_direction"]: r["cnt"] for r in rows}
+    bullish = direction_counts.get("bullish", 0)
+    bearish = direction_counts.get("bearish", 0)
+    total = bullish + bearish
+
+    if total > 0:
+        ratio = round(bullish / total * 100)
+        if ratio > 60:
+            overall = "偏多"
+        elif ratio < 40:
+            overall = "偏空"
+        else:
+            overall = "中性"
+    else:
+        overall = "数据不足"
+        ratio = 50
+
+    return jsonify({
+        "overall": overall,
+        "bullish_pct": ratio,
+        "bullish_count": bullish,
+        "bearish_count": bearish,
+        "total_analyzed": total,
+    })
 
 @app.route("/api/signals")
 def api_signals():

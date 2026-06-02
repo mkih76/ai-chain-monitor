@@ -61,10 +61,16 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
             source TEXT,
+            category TEXT DEFAULT 'general',
             title TEXT,
+            content TEXT,
             url TEXT,
             keywords TEXT,
             relevance TEXT,
+            ai_direction TEXT,
+            ai_confidence TEXT,
+            ai_reason TEXT,
+            affected_sectors TEXT,
             processed INTEGER DEFAULT 0
         )
     """)
@@ -141,6 +147,24 @@ def init_db():
             confidence TEXT,
             reasoning TEXT,
             FOREIGN KEY (news_id) REFERENCES news(id)
+        )
+    """)
+
+    # 材料价格数据
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS material_prices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            material TEXT,
+            price REAL,
+            unit TEXT,
+            change_pct REAL,
+            stockpile REAL,
+            stockpile_unit TEXT,
+            stockpile_change_pct REAL,
+            source TEXT,
+            ai_impact TEXT,
+            UNIQUE(timestamp, material)
         )
     """)
 
@@ -322,6 +346,40 @@ def insert_news_analysis(news_id, direction, affected_stocks, time_horizon, conf
     )
     conn.commit()
     conn.close()
+
+# ============================================================
+# 材料价格
+# ============================================================
+def insert_material_price(material, price, unit, change_pct, stockpile=None, stockpile_unit=None, stockpile_change_pct=None, source="", ai_impact=""):
+    conn = get_conn()
+    conn.execute(
+        """INSERT OR REPLACE INTO material_prices
+           (timestamp, material, price, unit, change_pct, stockpile, stockpile_unit, stockpile_change_pct, source, ai_impact)
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+        (datetime.now().isoformat(), material, price, unit, change_pct,
+         stockpile, stockpile_unit, stockpile_change_pct, source, ai_impact)
+    )
+    conn.commit()
+    conn.close()
+
+def get_latest_materials():
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT * FROM material_prices
+           WHERE id IN (SELECT MAX(id) FROM material_prices GROUP BY material)
+           ORDER BY material"""
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def get_material_history(material, days=30):
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM material_prices WHERE material=? ORDER BY timestamp DESC LIMIT ?",
+        (material, days)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 if __name__ == "__main__":
     init_db()
