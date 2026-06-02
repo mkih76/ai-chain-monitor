@@ -376,11 +376,79 @@ function dashboard() {
           }
         }
 
-        this.$nextTick(() => this.renderHeatmap());
+        this.$nextTick(() => {
+          this.renderHeatmap();
+          this.initGSAP();
+        });
       } catch (e) {
         console.error('Dashboard load error:', e);
         this.loading = false;
       }
+    },
+
+    initGSAP() {
+      gsap.registerPlugin(ScrollTrigger);
+
+      // Hero: flow section card slides up
+      gsap.from('.flow-section .card', {
+        y: 40, opacity: 0, duration: 0.8, ease: 'power3.out'
+      });
+
+      // Flow columns stagger in
+      gsap.from('.flow-col', {
+        y: 30, opacity: 0, duration: 0.6, stagger: 0.15, ease: 'power2.out', delay: 0.3
+      });
+
+      // Flow arrows pulse
+      gsap.to('.flow-arrow i', {
+        x: 6, duration: 0.8, repeat: -1, yoyo: true, ease: 'power1.inOut'
+      });
+
+      // Leading indicators card reveal
+      gsap.from('.card[style*="border-left"]', {
+        scrollTrigger: { trigger: '.card[style*="border-left"]', start: 'top 85%' },
+        y: 30, opacity: 0, duration: 0.7, ease: 'power2.out'
+      });
+
+      // Heatmap + signals cards
+      gsap.from('#heatmap-chart', {
+        scrollTrigger: { trigger: '#heatmap-chart', start: 'top 85%' },
+        scale: 0.95, opacity: 0, duration: 0.8, ease: 'power2.out'
+      });
+
+      gsap.from('.feed-item', {
+        scrollTrigger: { trigger: '.feed', start: 'top 85%' },
+        x: 30, opacity: 0, duration: 0.5, stagger: 0.08, ease: 'power2.out'
+      });
+
+      // Metric cards bounce in
+      gsap.from('.metric-card', {
+        scrollTrigger: { trigger: '.metrics-row', start: 'top 85%' },
+        y: 20, opacity: 0, scale: 0.9, duration: 0.5, stagger: 0.1, ease: 'back.out(1.4)'
+      });
+
+      // News section
+      gsap.from('.news-item', {
+        scrollTrigger: { trigger: '.news-item', start: 'top 90%' },
+        x: -20, opacity: 0, duration: 0.4, stagger: 0.06, ease: 'power2.out'
+      });
+
+      // Number counting for metric values
+      document.querySelectorAll('.metric-card__value').forEach(el => {
+        const text = el.textContent;
+        const num = parseFloat(text);
+        if (!isNaN(num) && Math.abs(num) > 0.1) {
+          const suffix = text.replace(/[\d.\-+]/g, '');
+          const obj = { val: 0 };
+          gsap.to(obj, {
+            val: num, duration: 1.2, ease: 'power2.out',
+            scrollTrigger: { trigger: el, start: 'top 90%' },
+            onUpdate: () => {
+              el.textContent = (num >= 0 ? '+' : '') + obj.val.toFixed(num % 1 === 0 ? 0 : 1) + suffix;
+            }
+          });
+        }
+      });
     },
 
     renderHeatmap() {
