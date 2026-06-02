@@ -109,6 +109,101 @@ def cmd_add_event(args):
     })
     print(f"✓ 已添加事件: {args.date} - {args.event}")
 
+def cmd_ai():
+    """AI多维关联分析"""
+    init_db()
+    from analyzers.ai_engine import run_ai_analysis
+    print("🤖 AI多维关联分析...")
+    result = run_ai_analysis(mode="global")
+    if result:
+        direction = result.get("direction", "N/A")
+        confidence = result.get("confidence", "N/A")
+        print(f"\n整体研判: {direction} 置信度:{confidence}")
+        if result.get("top_picks"):
+            print("\n重点关注:")
+            for pick in result["top_picks"]:
+                icon = "📈" if pick.get("direction") == "bullish" else "📉"
+                print(f"  {icon} {pick.get('name', '')}({pick.get('code', '')}): {pick.get('reason', '')}")
+        if result.get("catalyst"):
+            print(f"\n催化剂: {result['catalyst']}")
+        if result.get("risk"):
+            print(f"风险: {result['risk']}")
+    else:
+        print("  AI分析无结果（检查MiMo Proxy配置）")
+
+def cmd_upstream(args):
+    """查看上游产业数据"""
+    init_db()
+    from db import get_upstream_latest
+    source = args.source if hasattr(args, "source") else "all"
+
+    sources_map = {
+        "tsmc": ("TSMC月营收", "tsmc", "monthly_revenue_twd_mn"),
+        "lme": ("LME库存", "lme", None),
+        "dram": ("DRAM价格", "dram_market", None),
+    }
+
+    if source == "all":
+        targets = list(sources_map.items())
+    else:
+        targets = [(source, sources_map[source])]
+
+    print("\n📈 上游产业数据:")
+    print(f"{'来源':<15} {'日期':<12} {'指标':<25} {'数值':>15} {'YoY':>8} {'MoM':>8}")
+    print("-" * 80)
+
+    for key, (label, db_source, db_metric) in targets:
+        if db_metric:
+            data = get_upstream_latest(db_source, db_metric, limit=5)
+        else:
+            from db import get_conn
+            conn = get_conn()
+            rows = conn.execute(
+                "SELECT * FROM upstream_data WHERE source=? ORDER BY date DESC LIMIT 5",
+                (db_source,)
+            ).fetchall()
+            conn.close()
+            data = [dict(r) for r in rows]
+
+        for d in data:
+            yoy = f"{d.get('yoy_change', 0):+.1f}%" if d.get("yoy_change") else "-"
+            mom = f"{d.get('mom_change', 0):+.1f}%" if d.get("mom_change") else "-"
+            print(f"{label:<15} {d['date']:<12} {d['metric']:<25} {d['value']:>15,.0f} {yoy:>8} {mom:>8}")
+
+    if not any(get_upstream_latest(s, m, limit=1) for _, s, m in sources_map.values()):
+        print("  暂无上游数据，请先运行: python manage.py collect upstream")
+
+def cmd_overseas():
+    """查看海外标的行情"""
+    init_db()
+    from db import get_overseas_history
+
+    print("\n🌏 海外标的行情:")
+    print(f"{'标的':<15} {'最新价':>10} {'涨跌幅':>8} {'盘后价':>10} {'盘后涨跌':>8}")
+    print("-" * 55)
+
+    for symbol, info in config.OVERSEAS_STOCKS.items():
+        history = get_overseas_history(symbol, days=1)
+        if history:
+            latest = history[0]
+            close = latest.get("close", 0)
+            chg = latest.get("change_pct", 0) or 0
+            ah_price = latest.get("after_hours_price")
+            ah_chg = latest.get("after_hours_change_pct")
+
+            chg_str = f"{chg:+.1f}%"
+            ah_price_str = f"${ah_price:.2f}" if ah_price else "-"
+            ah_chg_str = f"{ah_chg:+.1f}%" if ah_chg else "-"
+
+            icon = "🟢" if chg > 0 else ("🔴" if chg < 0 else "⚪")
+            print(f"{icon} {info['name']:<12} ${close:>8.2f} {chg_str:>8} {ah_price_str:>10} {ah_chg_str:>8}")
+        else:
+            print(f"⚪ {info['name']:<12} {'N/A':>10}")
+
+    print(f"\n影响映射:")
+    for symbol, info in config.OVERSEAS_STOCKS.items():
+        print(f"  {info['name']}({symbol}) → {', '.join(info['affects'])}")
+
 def cmd_collect(args):
     """仅采集数据"""
     init_db()
@@ -122,14 +217,27 @@ def cmd_collect(args):
         from collectors.news_collector import collect_news
         news = collect_news()
         for n in news[:10]:
-            icon = "🔴" if n["relevance"] == "high" else "🟡"
-            print(f"{icon} [{n['score']}] {n['title']}")
+            icon = "🔴" if n.get("relevance") == "high" else "🟡"
+            ai_tag = ""
+            if n.get("ai_direction"):
+                ai_tag = f" AI:{n['ai_direction']}({n.get('ai_confidence', '')})"
+            print(f"{icon} [{n.get('score', 0)}] {n['title']}{ai_tag}")
+    elif args.source == "upstream":
+        from collectors.upstream_collector import collect_upstream_data
+        collect_upstream_data()
+    elif args.source == "overseas":
+        from collectors.overseas_collector import collect_overseas_stocks
+        collect_overseas_stocks()
     else:
         from collectors.stock_collector import collect_all
         from collectors.inventory_collector import collect_inventory
         from collectors.news_collector import collect_news
+        from collectors.upstream_collector import collect_upstream_data
+        from collectors.overseas_collector import collect_overseas_stocks
         collect_all()
         collect_inventory()
+        collect_upstream_data()
+        collect_overseas_stocks()
         collect_news()
 
 def main():
@@ -163,7 +271,18 @@ def main():
 
     p_collect = sub.add_parser("collect", help="采集数据")
     p_collect.add_argument("source", nargs="?", default="all",
-                          choices=["all", "stock", "inventory", "news"])
+                          choices=["all", "stock", "inventory", "news", "upstream", "overseas"])
+
+    # 新增: AI分析命令
+    sub.add_parser("ai", help="AI多维关联分析")
+
+    # 新增: 上游数据查看
+    p_upstream = sub.add_parser("upstream", help="查看上游产业数据")
+    p_upstream.add_argument("--source", default="all",
+                           choices=["all", "tsmc", "lme", "dram"])
+
+    # 新增: 海外标的查看
+    sub.add_parser("overseas", help="查看海外标的行情")
 
     args = parser.parse_args()
 
@@ -174,6 +293,8 @@ def main():
         "stock": lambda: cmd_stock(args), "calendar": cmd_calendar,
         "add-event": lambda: cmd_add_event(args),
         "collect": lambda: cmd_collect(args),
+        "ai": cmd_ai, "upstream": lambda: cmd_upstream(args),
+        "overseas": cmd_overseas,
     }
 
     if args.command in cmds:

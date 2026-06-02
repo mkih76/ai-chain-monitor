@@ -1,15 +1,25 @@
 """
-投行级信号分析引擎
-新增维度：估值异动、融资融券变化、龙虎榜上榜、机构调研密度、大宗交易溢价/折价
+投行级信号分析引擎 v2
+新增维度:
+  - 上游产业数据信号 (TSMC营收拐点、LME库存异动、DRAM价格变化)
+  - 海外联动信号 (NVDA/TSM/AVGO等隔夜异动→A股影响)
+  - 北向资金连续买入信号 (连续N天净买入同一股票)
+  - AI多维关联分析信号 (多信号共振检测)
+原有维度: 价格、库存、日历、估值、融资融券、龙虎榜、大宗交易
 """
 import sys
 import time
+import json
 sys.path.insert(0, "/opt/ai-monitor")
-from db import get_stock_history, get_inventory_history, insert_signal
+from db import (
+    get_stock_history, get_inventory_history, insert_signal,
+    get_overseas_history, get_upstream_latest, get_northbound_consecutive_buy,
+    get_northbound_by_code,
+)
 from collectors.inventory_collector import get_inventory_trend
 from collectors.institutional_collector import (
     fetch_valuation, fetch_margin_trading, fetch_dragon_tiger,
-    fetch_institutional_visits, fetch_block_trades, fetch_northbound_realtime
+    fetch_institutional_visits, fetch_block_trades, fetch_northbound_realtime,
 )
 from datetime import datetime, timedelta
 import config
@@ -130,7 +140,7 @@ def analyze_calendar_signals():
     return signals
 
 # ============================================================
-# 新增：投行级信号
+# 投行级信号（原有）
 # ============================================================
 def analyze_valuation_signals(code, name, sector):
     """估值异动信号"""
@@ -144,7 +154,6 @@ def analyze_valuation_signals(code, name, sector):
     mv = val.get("total_mv")
     change_60d = val.get("60day_change")
 
-    # PE 异常高/低
     if pe and pe > 0:
         if pe > 100:
             signals.append({
@@ -161,7 +170,6 @@ def analyze_valuation_signals(code, name, sector):
                 "severity": "medium",
             })
 
-    # 60日涨跌幅异常
     if change_60d:
         if change_60d > 50:
             signals.append({
@@ -178,7 +186,6 @@ def analyze_valuation_signals(code, name, sector):
                 "severity": "medium",
             })
 
-    # 市值突破关键位
     if mv:
         if mv > 1000:
             signals.append({
@@ -222,7 +229,7 @@ def analyze_margin_signals(code, name):
     return signals
 
 def analyze_dragon_tiger_signals(watchlist_codes):
-    """龙虎榜信号（全局，筛选监控标的中的上榜股）"""
+    """龙虎榜信号"""
     signals = []
     dt = fetch_dragon_tiger(days=3)
     if not dt:
@@ -232,7 +239,7 @@ def analyze_dragon_tiger_signals(watchlist_codes):
         if item["code"] in watchlist_codes:
             name = config.WATCHLIST.get(item["code"], (item["name"], ""))[0]
             net = item["net_buy"]
-            if abs(net) > 5e7:  # 净买入/卖出超过5000万
+            if abs(net) > 5e7:
                 if net > 0:
                     signals.append({
                         "type": "dragon_buy", "source": f"{name}({item['code']})",
@@ -260,7 +267,7 @@ def analyze_block_trade_signals(watchlist_codes):
         if item["code"] in watchlist_codes:
             name = config.WATCHLIST.get(item["code"], (item["name"], ""))[0]
             premium = item.get("premium", 0) or 0
-            if item["amount"] > 1e7:  # 超过1000万
+            if item["amount"] > 1e7:
                 if premium > 3:
                     signals.append({
                         "type": "block_premium", "source": f"{name}({item['code']})",
@@ -278,14 +285,14 @@ def analyze_block_trade_signals(watchlist_codes):
     return signals
 
 def analyze_northbound_signal():
-    """北向资金信号"""
+    """北向资金信号（总量）"""
     signals = []
     nb = fetch_northbound_realtime()
     if not nb or nb.get("total_net", 0) == 0:
         return signals
 
     total = nb["total_net"]
-    if total > 1000000:  # 净流入超过100万（万元=100亿）
+    if total > 1000000:
         signals.append({
             "type": "northbound_inflow", "source": "北向资金",
             "title": f"💰 北向资金大幅净流入 {nb['total_net_yi']}亿",
@@ -302,27 +309,139 @@ def analyze_northbound_signal():
     return signals
 
 # ============================================================
+# 新增信号: 北向资金连续买入
+# ============================================================
+def analyze_northbound_consecutive_signals():
+    """检测北向资金连续N天净买入同一股票"""
+    signals = []
+    params = config.NORTHBOUND_PARAMS
+    min_days = params.get("consecutive_days", 3)
+    threshold = params.get("net_buy_threshold", 5e7)
+
+    for code, (name, sector) in config.WATCHLIST.items():
+        consec, total = get_northbound_consecutive_buy(code, min_days=min_days)
+        if consec >= min_days and total > threshold:
+            signals.append({
+                "type": "northbound_consecutive_buy",
+                "source": f"{name}({code})",
+                "title": f"💰 {name} 北向连续{consec}天净买入",
+                "detail": f"累计净买入 {total/1e8:.2f}亿，板块: {sector}",
+                "severity": "high" if consec >= 5 else "medium",
+            })
+    return signals
+
+# ============================================================
+# 新增信号: 海外联动
+# ============================================================
+def analyze_overseas_linkage_signals():
+    """海外龙头隔夜异动→A股影响预警"""
+    signals = []
+    min_change = 3.0  # 海外标的涨跌幅阈值
+
+    for symbol, info in config.OVERSEAS_STOCKS.items():
+        history = get_overseas_history(symbol, days=2)
+        if not history:
+            continue
+        latest = history[0]
+        chg = latest.get("change_pct", 0) or 0
+
+        if abs(chg) >= min_change:
+            direction = "大涨" if chg > 0 else "大跌"
+            icon = "🚀" if chg > 0 else "💥"
+            affects = info.get("affects", [])
+            severity = "high" if abs(chg) >= 5 else "medium"
+
+            signals.append({
+                "type": "overseas_linkage",
+                "source": f"{info['name']}({symbol})",
+                "title": f"{icon} {info['name']} 隔夜{direction} {abs(chg):.1f}%",
+                "detail": f"影响A股板块: {', '.join(affects)}。{info.get('note', '')}",
+                "severity": severity,
+            })
+
+    return signals
+
+# ============================================================
+# 新增信号: 上游产业数据
+# ============================================================
+def analyze_upstream_signals():
+    """上游产业数据异动信号"""
+    signals = []
+
+    # TSMC营收拐点
+    tsmc_data = get_upstream_latest("tsmc", "monthly_revenue_twd_mn", limit=6)
+    if len(tsmc_data) >= 3:
+        latest = tsmc_data[0]
+        if latest.get("yoy_change") is not None:
+            yoy = latest["yoy_change"]
+            # YoY增速从负转正 = 拐点信号
+            prev_yoy = tsmc_data[1].get("yoy_change") if len(tsmc_data) > 1 else None
+            if prev_yoy is not None and prev_yoy < 0 and yoy > 0:
+                signals.append({
+                    "type": "tsmc_revenue_inflection",
+                    "source": "TSMC月度营收",
+                    "title": f"🔄 台积电营收YoY由负转正({yoy:+.1f}%)",
+                    "detail": f"营收拐点确认，下游封测/光模块3-6个月内大概率跟涨",
+                    "severity": "high",
+                })
+            elif yoy > 20:
+                signals.append({
+                    "type": "tsmc_revenue_boom",
+                    "source": "TSMC月度营收",
+                    "title": f"📈 台积电营收YoY高增 {yoy:+.1f}%",
+                    "detail": f"全球半导体需求强劲，利好全产业链",
+                    "severity": "medium",
+                })
+
+    # LME库存异动
+    for commodity in ["copper", "tin"]:
+        lme_data = get_upstream_latest("lme", f"{commodity}_stocks", limit=3)
+        if lme_data:
+            latest = lme_data[0]
+            yoy = latest.get("yoy_change")
+            if yoy is not None and yoy < -20:
+                cn_name = "铜" if commodity == "copper" else "锡"
+                signals.append({
+                    "type": f"lme_{commodity}_decline",
+                    "source": f"LME{cn_name}库存",
+                    "title": f"📉 LME{cn_name}库存同比降 {abs(yoy):.1f}%",
+                    "detail": f"全球{cn_name}供应收紧，利好国内{cn_name}板块",
+                    "severity": "medium",
+                })
+
+    # DRAM价格信号
+    dram_data = get_upstream_latest("dram_market", "dram_sentiment", limit=4)
+    if dram_data:
+        recent = [d for d in dram_data[:3] if d.get("value")]
+        if len(recent) >= 2 and all(d["value"] > 0 for d in recent):
+            signals.append({
+                "type": "dram_price_up",
+                "source": "DRAM价格",
+                "title": "📈 DRAM价格持续上涨",
+                "detail": "存储芯片涨价周期确认，利好服务器板块",
+                "severity": "medium",
+            })
+
+    return signals
+
+# ============================================================
 # 综合分析
 # ============================================================
 def run_all_analysis():
-    """运行全部分析"""
+    """运行基础分析（价格+库存+日历）"""
     all_signals = []
 
-    # 价格信号
     print("  分析价格信号...")
     for code, (name, sector) in config.WATCHLIST.items():
         sigs = analyze_stock_signals(code, name, sector)
         all_signals.extend(sigs)
 
-    # 库存信号
     print("  分析库存信号...")
     all_signals.extend(analyze_inventory_signals())
 
-    # 日历信号
     print("  分析日历信号...")
     all_signals.extend(analyze_calendar_signals())
 
-    # 存入数据库
     for sig in all_signals:
         insert_signal(sig["type"], sig["source"], sig["title"],
                       sig["detail"], sig["severity"])
@@ -331,39 +450,33 @@ def run_all_analysis():
     return all_signals
 
 def run_institutional_analysis():
-    """运行投行级分析（较慢，需逐只请求API）"""
+    """运行投行级分析（估值+融资融券+龙虎榜+大宗+北向）"""
     all_signals = []
 
-    # 估值信号
     print("  分析估值信号...")
     for code, (name, sector) in config.WATCHLIST.items():
         sigs = analyze_valuation_signals(code, name, sector)
         all_signals.extend(sigs)
         time.sleep(0.5)
 
-    # 融资融券信号
     print("  分析融资融券信号...")
     for code, (name, sector) in config.WATCHLIST.items():
         sigs = analyze_margin_signals(code, name)
         all_signals.extend(sigs)
         time.sleep(0.3)
 
-    # 龙虎榜信号
     print("  分析龙虎榜信号...")
     watchlist_codes = set(config.WATCHLIST.keys())
     all_signals.extend(analyze_dragon_tiger_signals(watchlist_codes))
     time.sleep(0.3)
 
-    # 大宗交易信号
     print("  分析大宗交易信号...")
     all_signals.extend(analyze_block_trade_signals(watchlist_codes))
     time.sleep(0.3)
 
-    # 北向资金信号
     print("  分析北向资金信号...")
     all_signals.extend(analyze_northbound_signal())
 
-    # 存入数据库
     for sig in all_signals:
         insert_signal(sig["type"], sig["source"], sig["title"],
                       sig["detail"], sig["severity"])
@@ -371,11 +484,32 @@ def run_institutional_analysis():
     print(f"  投行信号: {len(all_signals)}个")
     return all_signals
 
+def run_upstream_analysis():
+    """运行上游产业+海外联动分析（新增）"""
+    all_signals = []
+
+    print("  分析上游产业信号...")
+    all_signals.extend(analyze_upstream_signals())
+
+    print("  分析海外联动信号...")
+    all_signals.extend(analyze_overseas_linkage_signals())
+
+    print("  分析北向连续买入信号...")
+    all_signals.extend(analyze_northbound_consecutive_signals())
+
+    for sig in all_signals:
+        insert_signal(sig["type"], sig["source"], sig["title"],
+                      sig["detail"], sig["severity"])
+
+    print(f"  上游+海外信号: {len(all_signals)}个")
+    return all_signals
+
 def run_full_analysis():
-    """完整分析 = 基础 + 投行"""
+    """完整分析 = 基础 + 投行 + 上游 + 海外"""
     basic = run_all_analysis()
     institutional = run_institutional_analysis()
-    return basic + institutional
+    upstream = run_upstream_analysis()
+    return basic + institutional + upstream
 
 if __name__ == "__main__":
     import time

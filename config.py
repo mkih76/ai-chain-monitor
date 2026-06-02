@@ -1,5 +1,6 @@
 """
 AI产业链监控系统 - 配置文件
+包含: 监控标的、信号阈值、数据源、推送、上游产业、海外联动、AI分析引擎
 """
 import os
 
@@ -29,6 +30,97 @@ WATCHLIST = {
     # 国产算力
     "688256": ("寒武纪", "国产算力"),
     "688041": ("海光信息", "国产算力"),
+}
+
+# === 海外标的映射 ===
+# 海外龙头标的 → A股受益板块，用于跨市场联动分析
+OVERSEAS_STOCKS = {
+    "NVDA": {
+        "name": "NVIDIA",
+        "affects": ["光模块", "服务器", "封装", "PCB"],
+        "note": "AI需求总龙头，A股AI板块定价锚点",
+    },
+    "TSM": {
+        "name": "台积电",
+        "affects": ["封装", "光模块", "PCB"],
+        "note": "产能分配决定下游出货量",
+    },
+    "AVGO": {
+        "name": "Broadcom",
+        "affects": ["光模块", "PCB"],
+        "note": "定制芯片(ASIC)需求，光模块替代逻辑",
+    },
+    "MU": {
+        "name": "美光科技",
+        "affects": ["服务器"],
+        "note": "存储价格风向标",
+    },
+    "SMCI": {
+        "name": "Super Micro",
+        "affects": ["服务器", "液冷"],
+        "note": "AI服务器出货量直接指标",
+    },
+    "ASML": {
+        "name": "ASML",
+        "affects": ["封装", "国产算力"],
+        "note": "设备订单领先产能6-9个月",
+    },
+}
+
+# === 上游产业数据源 ===
+UPSTREAM_SOURCES = {
+    # TSMC月度营收（每月10日前公布）
+    "tsmc_revenue": {
+        "url": "https://investor.tsmc.com/english/quarterly-results",
+        "description": "台积电月度营收，领先下游封测/光模块3-6个月",
+        "frequency": "monthly",
+    },
+    # LME铜库存
+    "lme_copper": {
+        "url": "https://www.lme.com/en/market-data/reports-and-data/stocks",
+        "description": "LME铜库存，全球铜供需指标",
+        "frequency": "daily",
+    },
+    # LME锡库存
+    "lme_tin": {
+        "url": "https://www.lme.com/en/market-data/reports-and-data/stocks",
+        "description": "LME锡库存，全球锡供需指标",
+        "frequency": "daily",
+    },
+    # DRAM/NAND现货价格 (TrendForce)
+    "dram_price": {
+        "url": "https://www.trendforce.com/presscenter",
+        "description": "存储芯片现货价格，领先服务器板块2-4周",
+        "frequency": "weekly",
+    },
+}
+
+# === 财联社电报配置 ===
+CLS_TELEGRAPH = {
+    "api": "https://www.cls.cn/nodeapi/updateTelegraph",
+    "keywords": ["AI", "算力", "芯片", "半导体", "光模块", "服务器", "铜", "锡",
+                  "数据中心", "英伟达", "GPU", "CoWoS", "封装", "液冷", "PCB"],
+}
+
+# === AI分析引擎配置 ===
+AI_ENGINE = {
+    "enabled": True,
+    # MiMo LLM Proxy (本地免费)
+    "mimo_proxy_url": os.environ.get("MIMO_PROXY_URL", "http://localhost:3001/open-apis/bot/chat"),
+    "mimo_service_token": os.environ.get("MIMO_SERVICE_TOKEN", ""),
+    "mimo_user_id": os.environ.get("MIMO_USER_ID", ""),
+    "mimo_cookie": os.environ.get("MIMO_COOKIE", ""),
+    # 分析参数
+    "max_news_per_batch": 20,       # 每批最多分析N条新闻
+    "confidence_threshold": "medium",  # 推送最低置信度
+    "multi_signal_min": 3,          # 多信号共振最低维度数
+}
+
+# === 北向资金连续监控参数 ===
+NORTHBOUND_PARAMS = {
+    "consecutive_days": 3,     # 连续N天净买入同一股票触发
+    "net_buy_threshold": 5e7,  # 单日净买入阈值(元)
+    "total_net_alert": 1e8,    # 总净流入预警线(万元=100亿)
 }
 
 # === 信号阈值 ===
