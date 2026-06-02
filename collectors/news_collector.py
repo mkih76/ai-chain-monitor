@@ -27,65 +27,64 @@ HEADERS = {
 KEYWORDS = {
     # 高权重 - 直接相关
     "capex": 10, "资本开支": 10, "资本支出": 10,
-    "算力": 8, "AI服务器": 8, "光模块": 8, "先进封装": 8,
-    "CoWoS": 9, "英伟达": 8, "GPU": 7,
+    "AI": 6, "AI服务器": 8, "AI芯片": 8, "AI算力": 8, "AI助手": 5,
+    "算力": 8, "光模块": 8, "先进封装": 8,
+    "CoWoS": 9, "英伟达": 8, "NVIDIA": 8, "GPU": 7,
     # 中权重 - 产业链相关
     "数据中心": 6, "液冷": 6, "PCB": 5, "铜缆": 5,
     "半导体": 5, "芯片": 5, "封装": 5,
     # 原材料
     "锡库存": 7, "锡价": 7, "铜库存": 6, "铜价": 6,
     "LME": 6, "SHFE": 6, "仓单": 6,
+    "镍": 6, "镍价": 7, "镍库存": 7,
     # 低权重 - 宏观
-    "人工智能": 3, "大模型": 3, "AIGC": 3,
+    "人工智能": 5, "大模型": 5, "AIGC": 4, "AGI": 5,
     # 新增: 上游产业关键词
     "台积电": 7, "TSMC": 7, "营收": 5, "出货": 6,
     "扩产": 6, "涨价": 7, "产能": 6, "库存下降": 8,
-    "DRAM": 7, "NAND": 6, "存储": 5,
+    "DRAM": 7, "NAND": 6, "存储": 5, "HBM": 8,
 }
 
 # ============================================================
-# 1. 东方财富 (原有，保留)
+# 1. 新浪财经新闻 (替代失效的东方财富搜索API)
 # ============================================================
-def fetch_eastmoney_news():
-    """从东方财富抓取AI相关新闻"""
-    url = "https://searchapi.eastmoney.com/bussiness/Web/GetCMSSearchList"
-    keywords_list = ["AI算力", "光模块", "人工智能芯片", "锡价", "AI服务器",
-                     "台积电营收", "铜库存", "半导体设备"]
+def fetch_sina_finance_news():
+    """从新浪财经抓取7x24快讯"""
+    url = "https://feed.mix.sina.com.cn/api/roll/get"
     results = []
 
-    for kw in keywords_list:
-        try:
-            params = {
-                "type": "8193",
-                "keyword": kw,
-                "pageIndex": 1,
-                "pageSize": 5,
-            }
-            r = requests.get(url, params=params, timeout=10,
-                           headers={"User-Agent": "Mozilla/5.0"})
-            if r.status_code == 200:
-                data = r.json()
-                items = data.get("Data", []) or data.get("data", []) or []
-                if isinstance(items, dict):
-                    items = items.get("List", []) or items.get("list", []) or []
-                for item in items[:5]:
-                    title = item.get("Title", "") or item.get("title", "")
-                    news_url = item.get("Url", "") or item.get("url", "")
-                    matches, score = _scan_text(title)
-                    if score >= 5:
-                        news = {
-                            "source": "eastmoney",
-                            "title": title,
-                            "url": news_url,
-                            "keywords": ",".join(matches),
-                            "score": score,
-                            "relevance": "high" if score >= 8 else "medium",
-                            "date": item.get("Date", "") or item.get("date", ""),
-                            "content": "",
-                        }
-                        results.append(news)
-        except Exception as e:
-            print(f"  [WARN] 东方财富新闻抓取失败 ({kw}): {e}")
+    try:
+        params = {
+            "pageid": "153",
+            "lid": "2516",  # 财经快讯
+            "k": "",
+            "num": 30,
+            "page": 1,
+        }
+        r = requests.get(url, params=params, timeout=10,
+                       headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200:
+            data = r.json()
+            items = data.get("result", {}).get("data", [])
+            for item in items:
+                title = item.get("title", "")
+                matches, score = _scan_text(title)
+                if score >= 5:
+                    ctime = item.get("ctime", 0)
+                    date_str = datetime.fromtimestamp(int(ctime)).strftime("%Y-%m-%d %H:%M") if ctime else ""
+                    news = {
+                        "source": "sina_finance",
+                        "title": title,
+                        "url": item.get("url", ""),
+                        "keywords": ",".join(matches),
+                        "score": score,
+                        "relevance": "high" if score >= 8 else "medium",
+                        "date": date_str,
+                        "content": "",
+                    }
+                    results.append(news)
+    except Exception as e:
+        print(f"  [WARN] 新浪财经新闻抓取失败: {e}")
 
     return results
 
@@ -94,57 +93,67 @@ def fetch_eastmoney_news():
 # ============================================================
 def fetch_cls_telegraph():
     """从财联社抓取实时电报"""
-    print("  采集财联社电报...")
-    url = "https://www.cls.cn/nodeapi/updateTelegraph"
     results = []
     cls_config = getattr(config, "CLS_TELEGRAPH", {})
     watch_keywords = cls_config.get("keywords", [])
 
-    try:
-        params = {
-            "app": "CailianpressWeb",
-            "category": "",
-            "os": "web",
-            "sv": "8.4.6",
-            "rn": "30",
-        }
-        r = requests.get(url, params=params, headers={
-            "User-Agent": "Mozilla/5.0",
-            "Referer": "https://www.cls.cn/telegraph",
-        }, timeout=15)
+    # 尝试多个API端点
+    urls = [
+        "https://www.cls.cn/v1/roll/get_roll_list",
+        "https://www.cls.cn/nodeapi/telegraphList",
+    ]
 
-        if r.status_code == 200:
-            data = r.json()
-            items = data.get("data", {}).get("roll_data", [])
-            if not items:
-                items = data.get("data", [])
+    for url in urls:
+        try:
+            params = {
+                "app": "CailianpressWeb",
+                "category": "",
+                "os": "web",
+                "sv": "8.4.6",
+                "rn": "50",
+            }
+            r = requests.get(url, params=params, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Referer": "https://www.cls.cn/telegraph",
+            }, timeout=15)
 
-            for item in items:
-                content = item.get("content", "") or item.get("brief", "")
-                title = item.get("title", "") or content[:80]
-                ctime = item.get("ctime", 0)
-                date_str = datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M") if ctime else ""
+            if r.status_code == 200:
+                data = r.json()
+                # 尝试多种返回格式
+                items = (data.get("data", {}).get("roll_data", []) or
+                        data.get("data", {}).get("list", []) or
+                        data.get("data", []))
+                if not isinstance(items, list):
+                    items = []
 
-                # 关键词过滤
-                matched = [kw for kw in watch_keywords if kw.lower() in (title + content).lower()]
-                if not matched:
-                    continue
+                for item in items:
+                    content = item.get("content", "") or item.get("brief", "")
+                    title = item.get("title", "") or content[:80]
+                    ctime = item.get("ctime", 0)
+                    date_str = datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M") if ctime else ""
 
-                score = len(matched) * 5
-                results.append({
-                    "source": "cls_telegraph",
-                    "title": title,
-                    "url": f"https://www.cls.cn/detail/{item.get('id', '')}",
-                    "keywords": ",".join(matched),
-                    "score": score,
-                    "relevance": "high" if score >= 10 else "medium",
-                    "date": date_str,
-                    "content": content[:500],
-                })
-    except Exception as e:
-        print(f"  [WARN] 财联社电报抓取失败: {e}")
+                    # 关键词过滤
+                    matched = [kw for kw in watch_keywords if kw.lower() in (title + content).lower()]
+                    if not matched:
+                        continue
 
-    print(f"    财联社: {len(results)}条相关")
+                    score = len(matched) * 5
+                    results.append({
+                        "source": "cls_telegraph",
+                        "title": title,
+                        "url": f"https://www.cls.cn/detail/{item.get('id', '')}",
+                        "keywords": ",".join(matched),
+                        "score": score,
+                        "relevance": "high" if score >= 10 else "medium",
+                        "date": date_str,
+                        "content": content[:500],
+                    })
+
+                if results:
+                    break  # 成功获取数据，停止尝试其他端点
+        except Exception as e:
+            pass  # 尝试下一个端点
+
     return results
 
 # ============================================================
@@ -372,18 +381,19 @@ def collect_news():
     print("  === 采集行业新闻 ===")
     all_news = []
 
-    # 东方财富
-    em_news = fetch_eastmoney_news()
-    all_news.extend(em_news)
-    print(f"  ✓ 东方财富: {len(em_news)}条相关")
+    # 新浪财经快讯 (替代失效的东方财富搜索API)
+    sina_news = fetch_sina_finance_news()
+    all_news.extend(sina_news)
+    print(f"  ✓ 新浪财经: {len(sina_news)}条相关")
     time.sleep(1)
 
-    # 财联社电报 (新增)
+    # 财联社电报
     cls_news = fetch_cls_telegraph()
     all_news.extend(cls_news)
+    print(f"  ✓ 财联社: {len(cls_news)}条相关")
     time.sleep(1)
 
-    # 巨潮公告 (新增)
+    # 巨潮公告
     cn_news = fetch_cninfo_announcements()
     all_news.extend(cn_news)
 
