@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}AI产业链监控{% endblock %}</title>
 
-  <!-- Inter font (SF Pro substitute) -->
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-  <!-- Apple CSS -->
-  <link rel="stylesheet" href="/static/css/apple.css">
+  <!-- Main CSS -->
+  <link rel="stylesheet" href="/static/css/main.css">
 
   <!-- ECharts -->
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
@@ -25,29 +25,29 @@
 </head>
 <body>
 
-  <!-- Global Nav -->
-  <nav class="global-nav">
-    <div class="global-nav__brand">
-      <i class="fa-solid fa-chart-line" style="font-size:16px; color: var(--color-primary);"></i>
-      <span>AI产业链监控</span>
-    </div>
-    <div class="global-nav__links">
-      <a href="/" class="global-nav__link {% if request.path == '/' %}active{% endif %}">首页</a>
-      <a href="/news" class="global-nav__link {% if request.path == '/news' %}active{% endif %}">消息</a>
-      <a href="/analysis" class="global-nav__link {% if request.path == '/analysis' %}active{% endif %}">AI分析</a>
-    </div>
-    <div class="global-nav__actions">
-      <span class="fine-print" id="nav-clock"></span>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav__inner">
+      <a href="/" class="nav__brand">
+        <div class="nav__brand-icon">AI</div>
+        <span>AI产业链监控</span>
+      </a>
+      <div class="nav__links">
+        <a href="/" class="nav__link {% if request.path == '/' %}active{% endif %}">
+          <i class="fa-solid fa-chart-line" style="font-size:11px; margin-right:4px;"></i>总览
+        </a>
+        <a href="/news" class="nav__link {% if request.path == '/news' %}active{% endif %}">
+          <i class="fa-solid fa-newspaper" style="font-size:11px; margin-right:4px;"></i>消息
+        </a>
+        <a href="/analysis" class="nav__link {% if request.path == '/analysis' %}active{% endif %}">
+          <i class="fa-solid fa-brain" style="font-size:11px; margin-right:4px;"></i>AI分析
+        </a>
+      </div>
+      <div class="nav__clock" id="nav-clock"></div>
     </div>
   </nav>
 
-  <!-- Sub Nav -->
-  <div class="sub-nav">
-    <div class="sub-nav__title">{% block page_title %}总览{% endblock %}</div>
-    <div class="sub-nav__links">
-      {% block subnav %}{% endblock %}
-    </div>
-  </div>
+  {% block ticker %}{% endblock %}
 
   <!-- Main Content -->
   <main>
@@ -55,42 +55,20 @@
   </main>
 
   <!-- Footer -->
-  <footer class="site-footer">
+  <footer class="footer">
     <div class="container">
-      <div class="footer-grid">
-        <div class="footer-col">
-          <div class="footer-col__title">数据源</div>
-          <a href="#">腾讯财经</a>
-          <a href="#">新浪财经</a>
-          <a href="#">东方财富</a>
-          <a href="#">上期所</a>
+      <div class="footer__inner">
+        <span>AI产业链监控 v3 · 数据仅供参考，不构成投资建议</span>
+        <div class="footer__links">
+          <a href="/api/health" class="footer__link">API</a>
+          <a href="/api/dashboard" class="footer__link">数据</a>
+          <span class="footer__link">采集自公开市场</span>
         </div>
-        <div class="footer-col">
-          <div class="footer-col__title">上游数据</div>
-          <a href="#">TSMC IR</a>
-          <a href="#">LME</a>
-          <a href="#">SEMI</a>
-        </div>
-        <div class="footer-col">
-          <div class="footer-col__title">海外标的</div>
-          <a href="#">NVIDIA</a>
-          <a href="#">TSMC</a>
-          <a href="#">Broadcom</a>
-        </div>
-        <div class="footer-col">
-          <div class="footer-col__title">系统</div>
-          <a href="/api/health">健康检查</a>
-          <a href="/api/signals">信号API</a>
-          <a href="/api/dashboard">仪表盘API</a>
-        </div>
-      </div>
-      <div class="footer-legal">
-        AI产业链智能监控系统 v2 · 数据仅供参考，不构成投资建议 · 采集自公开市场数据
       </div>
     </div>
   </footer>
 
-  <!-- Nav Clock -->
+  <!-- Clock -->
   <script>
     function updateClock() {
       const el = document.getElementById('nav-clock');

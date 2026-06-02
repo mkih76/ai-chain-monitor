@@ -1,113 +1,113 @@
 {% extends "base.html" %}
 
 {% block title %}{{ code }} — AI产业链监控{% endblock %}
-{% block page_title %}个股详情{% endblock %}
-
-{% block subnav %}
-<a href="/" class="sub-nav__link">← 返回总览</a>
-{% endblock %}
 
 {% block content %}
 <div x-data="stockPage('{{ code }}')" x-init="load()">
 
-  <!-- Stock Hero (dark) -->
-  <section class="tile tile-dark" style="padding-top:48px; padding-bottom:48px;">
-    <div class="container" style="max-width:980px;">
+  <!-- Stock Hero -->
+  <section style="padding:24px 0 8px;">
+    <div class="container">
+      <a href="/" class="btn" style="font-size:11px; padding:4px 10px; margin-bottom:16px;">
+        <i class="fa-solid fa-arrow-left" style="font-size:9px;"></i> 返回总览
+      </a>
 
-      <div x-show="loading" style="text-align:center; padding:48px; color:var(--color-body-muted);">加载中...</div>
-
-      <div x-show="!loading && detail" style="text-align:center;">
-        <div class="caption-strong" style="color:var(--color-primary-on-dark); margin-bottom:4px;" x-text="detail.sector"></div>
-        <div class="hero-display" style="color:#fff; margin-bottom:8px;" x-text="detail.name"></div>
-        <div class="tagline" style="color:var(--color-body-muted); margin-bottom:24px;" x-text="detail.code"></div>
-
-        <div class="data-grid data-grid-4" style="max-width:600px; margin:0 auto;">
-          <div class="stat-card" style="background:var(--color-surface-tile-2); border-color:rgba(255,255,255,0.06);">
-            <div class="stat-card__label" style="color:var(--color-body-muted);">最新价</div>
-            <div class="stat-card__value" style="color:#fff;" x-text="latestPrice"></div>
-          </div>
-          <div class="stat-card" style="background:var(--color-surface-tile-2); border-color:rgba(255,255,255,0.06);">
-            <div class="stat-card__label" style="color:var(--color-body-muted);">涨跌幅</div>
-            <div class="stat-card__value" :class="changePct >= 0 ? 'text-up' : 'text-down'" x-text="changePctStr"></div>
-          </div>
-          <div class="stat-card" style="background:var(--color-surface-tile-2); border-color:rgba(255,255,255,0.06);">
-            <div class="stat-card__label" style="color:var(--color-body-muted);">PE(TTM)</div>
-            <div class="stat-card__value" style="color:#fff;" x-text="peTtm"></div>
-          </div>
-          <div class="stat-card" style="background:var(--color-surface-tile-2); border-color:rgba(255,255,255,0.06);">
-            <div class="stat-card__label" style="color:var(--color-body-muted);">总市值</div>
-            <div class="stat-card__value" style="color:#fff;" x-text="totalMv"></div>
+      <div class="card">
+        <div class="stock-hero" x-show="!loading && detail">
+          <div class="stock-hero__sector" x-text="detail.sector"></div>
+          <div class="stock-hero__name" x-text="detail.name"></div>
+          <div class="stock-hero__code" x-text="detail.code"></div>
+          <div class="stock-hero__price" :class="changePct >= 0 ? 'text-up' : 'text-down'" x-text="latestPrice"></div>
+          <div class="stock-hero__change" :class="changePct >= 0 ? 'text-up' : 'text-down'" x-text="changePctStr"></div>
+          <div class="stock-stats">
+            <div class="stock-stat">
+              <div class="stock-stat__label">PE(TTM)</div>
+              <div class="stock-stat__value" x-text="peTtm"></div>
+            </div>
+            <div class="stock-stat">
+              <div class="stock-stat__label">PB</div>
+              <div class="stock-stat__value" x-text="pb"></div>
+            </div>
+            <div class="stock-stat">
+              <div class="stock-stat__label">总市值</div>
+              <div class="stock-stat__value" x-text="totalMv"></div>
+            </div>
+            <div class="stock-stat">
+              <div class="stock-stat__label">60日涨跌</div>
+              <div class="stock-stat__value" :class="day60Change >= 0 ? 'text-up' : 'text-down'" x-text="day60ChangeStr"></div>
+            </div>
           </div>
         </div>
+        <div x-show="loading" class="loading"><span class="spinner"></span>加载中...</div>
       </div>
-
     </div>
   </section>
 
-  <!-- K-line Chart (light) -->
-  <section class="tile tile-light" style="padding-top:48px;">
-    <div class="container" style="max-width:980px;">
-      <div class="display-md" style="margin-bottom:32px;">K线走势</div>
-      <div id="kline-chart" class="chart-container" style="height:400px;"></div>
+  <!-- K-line Chart -->
+  <section style="padding:16px 0;">
+    <div class="container">
+      <div class="card">
+        <div class="card__header">
+          <div class="card__title">
+            <div class="card__title-icon"></div>
+            K线走势
+          </div>
+          <div class="card__subtitle">60日</div>
+        </div>
+        <div class="card__body card__body--flush">
+          <div id="kline-chart" class="chart-container"></div>
+        </div>
+      </div>
     </div>
   </section>
 
-  <!-- Multi-dimensional (dark) -->
-  <section class="tile tile-dark" style="padding-top:48px;">
-    <div class="container" style="max-width:980px;">
-      <div class="display-md" style="color:#fff; margin-bottom:32px;">多维数据</div>
-
-      <div class="data-grid" style="grid-template-columns: 1fr 1fr;">
+  <!-- Multi-dimensional Data -->
+  <section style="padding:0 0 24px;">
+    <div class="container">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
 
         <!-- Northbound -->
-        <div class="card-dark">
-          <div class="caption-strong" style="color:var(--color-primary-on-dark); margin-bottom:12px;">北向资金</div>
-          <div style="font-size:28px; font-weight:600; color:#fff;"
-               x-text="detail && detail.northbound ? detail.northbound.consecutive_days + '天连续买入' : '无连续买入'"></div>
-          <div class="caption" style="color:var(--color-body-muted); margin-top:4px;"
-               x-text="detail && detail.northbound && detail.northbound.total_yi > 0 ? '累计 ' + detail.northbound.total_yi + ' 亿' : ''"></div>
+        <div class="card">
+          <div class="card__header">
+            <div class="card__title">
+              <div class="card__title-icon" style="background:var(--up);"></div>
+              北向资金
+            </div>
+          </div>
+          <div class="card__body">
+            <div style="text-align:center;">
+              <div class="text-2xl font-bold"
+                   :class="detail && detail.northbound && detail.northbound.consecutive_days > 0 ? 'text-up' : 'text-muted'"
+                   x-text="detail && detail.northbound ? detail.northbound.consecutive_days + '天连续买入' : '无连续买入'"></div>
+              <div class="text-sm text-muted" style="margin-top:4px;"
+                   x-text="detail && detail.northbound && detail.northbound.total_yi > 0 ? '累计 ' + detail.northbound.total_yi + ' 亿' : ''"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Margin -->
-        <div class="card-dark">
-          <div class="caption-strong" style="color:var(--color-primary-on-dark); margin-bottom:12px;">融资融券</div>
-          <template x-if="detail && detail.margin && detail.margin.length > 0">
-            <div>
-              <div style="font-size:28px; font-weight:600; color:#fff;"
-                   x-text="detail.margin[0].rz_balance_yi + '亿'"></div>
-              <div class="caption" style="color:var(--color-body-muted); margin-top:4px;">融资余额</div>
+        <div class="card">
+          <div class="card__header">
+            <div class="card__title">
+              <div class="card__title-icon" style="background:var(--accent);"></div>
+              融资融券
             </div>
-          </template>
-          <template x-if="!detail || !detail.margin || detail.margin.length === 0">
-            <div class="caption" style="color:var(--color-body-muted);">暂无数据</div>
-          </template>
+          </div>
+          <div class="card__body">
+            <template x-if="detail && detail.margin && detail.margin.length > 0">
+              <div style="text-align:center;">
+                <div class="text-2xl font-bold" x-text="detail.margin[0].rz_balance_yi + '亿'"></div>
+                <div class="text-sm text-muted" style="margin-top:4px;">融资余额</div>
+              </div>
+            </template>
+            <template x-if="!detail || !detail.margin || detail.margin.length === 0">
+              <div class="empty-state" style="padding:24px;">
+                <div class="empty-state__text">暂无数据</div>
+              </div>
+            </template>
+          </div>
         </div>
 
-      </div>
-    </div>
-  </section>
-
-  <!-- Valuation (light) -->
-  <section class="tile tile-parchment" style="padding-top:48px;">
-    <div class="container" style="max-width:980px;">
-      <div class="display-md" style="margin-bottom:32px;">估值指标</div>
-      <div class="data-grid data-grid-4">
-        <div class="stat-card">
-          <div class="stat-card__label">PE(TTM)</div>
-          <div class="stat-card__value" x-text="peTtm"></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card__label">PB</div>
-          <div class="stat-card__value" x-text="pb"></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card__label">换手率</div>
-          <div class="stat-card__value" x-text="turnoverRate"></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card__label">60日涨跌</div>
-          <div class="stat-card__value" :class="day60Change >= 0 ? 'text-up' : 'text-down'" x-text="day60ChangeStr"></div>
-        </div>
       </div>
     </div>
   </section>
@@ -121,7 +121,6 @@ function stockPage(code) {
   return {
     loading: true,
     detail: null,
-    klineChart: null,
 
     get latestPrice() {
       const k = this.detail && this.detail.kline;
@@ -147,10 +146,6 @@ function stockPage(code) {
       const v = this.detail && this.detail.valuation;
       return v && v.total_mv ? v.total_mv.toFixed(0) + '亿' : 'N/A';
     },
-    get turnoverRate() {
-      const v = this.detail && this.detail.valuation;
-      return v && v.turnover_rate ? v.turnover_rate.toFixed(2) + '%' : 'N/A';
-    },
     get day60Change() {
       const v = this.detail && this.detail.valuation;
       return v && v['60day_change'] ? v['60day_change'] : 0;
@@ -174,7 +169,6 @@ function stockPage(code) {
     renderKline() {
       const k = this.detail && this.detail.kline;
       if (!k || k.length === 0) return;
-
       const el = document.getElementById('kline-chart');
       if (!el) return;
 
@@ -187,23 +181,40 @@ function stockPage(code) {
       chart.setOption({
         backgroundColor: 'transparent',
         tooltip: { trigger: 'axis' },
-        xAxis: { type: 'category', data: dates,
-                 axisLine: { lineStyle: { color: '#e0e0e0' } },
-                 axisLabel: { color: '#7a7a7a', fontSize: 11 } },
+        xAxis: {
+          type: 'category', data: dates,
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisLabel: { color: '#94a3b8', fontSize: 11 }
+        },
         yAxis: [
-          { type: 'value', splitLine: { lineStyle: { color: '#f0f0f0' } },
-            axisLabel: { color: '#7a7a7a', fontSize: 11 } },
-          { type: 'value', splitLine: { show: false },
-            axisLabel: { color: '#7a7a7a', fontSize: 11, formatter: v => (v/10000).toFixed(0) + '万' } }
+          {
+            type: 'value', splitLine: { lineStyle: { color: '#f1f5f9' } },
+            axisLabel: { color: '#94a3b8', fontSize: 11 }
+          },
+          {
+            type: 'value', splitLine: { show: false },
+            axisLabel: { color: '#94a3b8', fontSize: 11, formatter: v => (v/10000).toFixed(0) + '万' }
+          }
         ],
         series: [
-          { name: '收盘价', type: 'line', data: closes, smooth: true,
-            lineStyle: { color: '#0066cc', width: 2 },
-            itemStyle: { color: '#0066cc' },
-            areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-              colorStops: [{ offset: 0, color: 'rgba(0,102,204,0.15)' }, { offset: 1, color: 'rgba(0,102,204,0)' }] } } },
-          { name: '成交量', type: 'bar', yAxisIndex: 1, data: volumes,
-            itemStyle: { color: 'rgba(0,102,204,0.3)' } }
+          {
+            name: '收盘价', type: 'line', data: closes, smooth: true,
+            lineStyle: { color: '#2563eb', width: 2 },
+            itemStyle: { color: '#2563eb' },
+            areaStyle: {
+              color: {
+                type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                colorStops: [
+                  { offset: 0, color: 'rgba(37,99,235,0.12)' },
+                  { offset: 1, color: 'rgba(37,99,235,0)' }
+                ]
+              }
+            }
+          },
+          {
+            name: '成交量', type: 'bar', yAxisIndex: 1, data: volumes,
+            itemStyle: { color: 'rgba(37,99,235,0.2)' }
+          }
         ],
         grid: { left: 60, right: 30, top: 20, bottom: 40 },
       });

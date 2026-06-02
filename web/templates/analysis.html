@@ -1,130 +1,139 @@
 {% extends "base.html" %}
 
 {% block title %}AI分析 — AI产业链监控{% endblock %}
-{% block page_title %}AI分析{% endblock %}
-
-{% block subnav %}
-<a href="#" class="sub-nav__link" @click.prevent="mode='global'" :style="mode==='global'?'color:var(--color-primary)':''">全局扫描</a>
-<a href="#" class="sub-nav__link" @click.prevent="mode='per_stock'" :style="mode==='per_stock'?'color:var(--color-primary)':''">逐股分析</a>
-<a href="#" class="sub-nav__link" @click.prevent="mode='per_sector'" :style="mode==='per_sector'?'color:var(--color-primary)':''">板块分析</a>
-{% endblock %}
 
 {% block content %}
 <div x-data="analysisPage()" x-init="load()">
 
-  <!-- Analysis Tile (dark) -->
-  <section class="tile tile-dark" style="padding-top:48px; padding-bottom:48px;">
-    <div class="container" style="max-width:980px;">
-      <div class="display-md" style="color:#fff; margin-bottom:12px;">AI多维关联分析</div>
-      <div class="lead" style="color:var(--color-body-muted); margin-bottom:32px;">
-        5维数据融合 · 置信度模型 · 信号共振检测
-      </div>
-
-      <div x-show="loading" style="text-align:center; padding:48px; color:var(--color-body-muted);">
-        <i class="fa-solid fa-spinner fa-spin" style="font-size:24px; margin-bottom:12px;"></i>
-        <div>AI分析中，请稍候...</div>
-      </div>
-
-      <div x-show="!loading && latest" style="max-width:700px; margin:0 auto;">
-        <!-- Overall Direction -->
-        <div style="text-align:center; margin-bottom:32px;">
-          <div style="font-size:48px; margin-bottom:8px;"
-               x-text="latest.direction === 'bullish' ? '📈' : latest.direction === 'bearish' ? '📉' : '➡️'"></div>
-          <div class="display-lg" style="color:#fff;"
-               x-text="latest.direction === 'bullish' ? '偏多' : latest.direction === 'bearish' ? '偏空' : '中性'"></div>
-          <div class="tagline" style="margin-top:8px;"
-               :style="'color:' + (latest.confidence === 'high' ? '#1d713a' : latest.confidence === 'medium' ? '#bf8500' : '#7a7a7a')"
-               x-text="'置信度: ' + (latest.confidence === 'high' ? '高' : latest.confidence === 'medium' ? '中' : '低')"></div>
+  <!-- Analysis Overview -->
+  <section style="padding:16px 0;">
+    <div class="container">
+      <div class="card">
+        <div class="card__header">
+          <div class="card__title">
+            <div class="card__title-icon" style="background:#a371f7;"></div>
+            AI多维关联分析
+          </div>
+          <div class="card__subtitle">5维数据融合 · 置信度模型 · 信号共振检测</div>
         </div>
+        <div class="card__body">
 
-        <!-- Top Picks -->
-        <div x-show="latest.top_picks && latest.top_picks.length > 0" style="margin-bottom:32px;">
-          <div class="caption-strong" style="color:var(--color-body-muted); margin-bottom:12px;">重点关注</div>
-          <template x-for="pick in (latest.top_picks || [])" :key="pick.code">
-            <div class="card-dark" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
-              <div>
-                <span style="font-size:20px; margin-right:8px;"
-                      x-text="pick.direction === 'bullish' ? '📈' : '📉'"></span>
-                <span class="body-strong" style="color:#fff;" x-text="pick.name"></span>
-                <span class="caption" style="color:var(--color-body-muted); margin-left:8px;" x-text="'(' + pick.code + ')'"></span>
+          <div x-show="loading" class="loading"><span class="spinner"></span>AI分析中，请稍候...</div>
+
+          <div x-show="!loading && latest">
+            <!-- Direction -->
+            <div class="analysis-direction">
+              <div class="analysis-direction__icon"
+                   x-text="latest.direction === 'bullish' ? '📈' : latest.direction === 'bearish' ? '📉' : '➡️'"></div>
+              <div class="analysis-direction__label"
+                   :class="latest.direction === 'bullish' ? 'text-up' : latest.direction === 'bearish' ? 'text-down' : 'text-muted'"
+                   x-text="latest.direction === 'bullish' ? '偏多' : latest.direction === 'bearish' ? '偏空' : '中性'"></div>
+              <div class="analysis-direction__confidence"
+                   :class="latest.confidence === 'high' ? 'text-up' : latest.confidence === 'medium' ? 'text-warning' : 'text-muted'"
+                   x-text="'置信度: ' + (latest.confidence === 'high' ? '高' : latest.confidence === 'medium' ? '中' : '低')"></div>
+            </div>
+
+            <!-- Top Picks -->
+            <div x-show="latest.top_picks && latest.top_picks.length > 0" style="margin-bottom:20px;">
+              <div class="text-sm font-semibold text-muted" style="margin-bottom:8px;">重点关注</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <template x-for="pick in (latest.top_picks || [])" :key="pick.code">
+                  <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:var(--radius);">
+                    <div>
+                      <span x-text="pick.direction === 'bullish' ? '📈' : '📉'" style="margin-right:6px;"></span>
+                      <span class="font-semibold" x-text="pick.name"></span>
+                      <span class="text-sm text-muted" style="margin-left:6px;" x-text="'(' + pick.code + ')'"></span>
+                    </div>
+                    <div class="text-sm text-muted" style="max-width:50%; text-align:right;" x-text="pick.reason"></div>
+                  </div>
+                </template>
               </div>
-              <div class="caption" style="color:var(--color-body-muted); max-width:50%;" x-text="pick.reason"></div>
             </div>
-          </template>
-        </div>
 
-        <!-- Catalyst & Risk -->
-        <div class="data-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:32px;">
-          <div class="card-dark">
-            <div class="caption-strong" style="color:var(--color-primary-on-dark); margin-bottom:8px;">
-              <i class="fa-solid fa-bolt"></i> 催化剂
+            <!-- Catalyst & Risk -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+              <div style="padding:14px; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:var(--radius);">
+                <div class="text-sm font-semibold text-accent" style="margin-bottom:6px;">
+                  <i class="fa-solid fa-bolt" style="font-size:10px;"></i> 催化剂
+                </div>
+                <div class="text-sm" x-text="latest.catalyst || 'N/A'"></div>
+              </div>
+              <div style="padding:14px; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:var(--radius);">
+                <div class="text-sm font-semibold text-warning" style="margin-bottom:6px;">
+                  <i class="fa-solid fa-triangle-exclamation" style="font-size:10px;"></i> 风险
+                </div>
+                <div class="text-sm" x-text="latest.risk || 'N/A'"></div>
+              </div>
             </div>
-            <div class="caption" style="color:#fff;" x-text="latest.catalyst || 'N/A'"></div>
+
+            <!-- Action -->
+            <div style="text-align:center;">
+              <span class="badge" style="font-size:13px; padding:6px 18px;"
+                    :class="latest.action === '立即关注' ? 'badge--critical' : latest.action === '等待确认' ? 'badge--high' : 'badge--medium'"
+                    x-text="latest.action || 'N/A'"></span>
+            </div>
           </div>
-          <div class="card-dark">
-            <div class="caption-strong" style="color:var(--color-warning, #bf8500); margin-bottom:8px;">
-              <i class="fa-solid fa-triangle-exclamation"></i> 风险
-            </div>
-            <div class="caption" style="color:#fff;" x-text="latest.risk || 'N/A'"></div>
+
+          <div x-show="!loading && !latest" class="empty-state">
+            <div class="empty-state__icon">🤖</div>
+            <div class="empty-state__text">暂无AI分析结果</div>
+            <div class="text-sm text-muted" style="margin-top:8px;">请先配置 MiMo LLM Proxy，然后运行: python manage.py ai</div>
           </div>
         </div>
-
-        <!-- Action -->
-        <div style="text-align:center;">
-          <div class="badge" style="font-size:14px; padding:8px 20px;"
-               :class="latest.action === '立即关注' ? 'badge-critical' : latest.action === '等待确认' ? 'badge-high' : 'badge-medium'"
-               x-text="latest.action || 'N/A'"></div>
-        </div>
-      </div>
-
-      <div x-show="!loading && !latest" style="text-align:center; padding:48px; color:var(--color-body-muted);">
-        <div style="font-size:48px; margin-bottom:16px;">🤖</div>
-        <div class="lead">暂无AI分析结果</div>
-        <div class="caption" style="margin-top:8px;">请先配置 MiMo LLM Proxy，然后运行: python manage.py ai</div>
       </div>
     </div>
   </section>
 
-  <!-- History Tile (light) -->
-  <section class="tile tile-parchment">
-    <div class="container" style="max-width:980px;">
-      <div class="display-md" style="margin-bottom:32px;">历史分析记录</div>
-
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>时间</th>
-            <th>目标</th>
-            <th>类型</th>
-            <th>方向</th>
-            <th>置信度</th>
-            <th>催化剂</th>
-          </tr>
-        </thead>
-        <tbody>
-          <template x-for="item in history" :key="item.id">
-            <tr>
-              <td class="fine-print" x-text="item.timestamp ? item.timestamp.substring(5, 16) : ''"></td>
-              <td class="body-strong" x-text="item.target"></td>
-              <td class="caption" x-text="item.analysis_type === 'global_scan' ? '全局扫描' : item.analysis_type === 'composite' ? '个股分析' : '板块分析'"></td>
-              <td>
-                <span :class="item.direction === 'bullish' ? 'text-up' : item.direction === 'bearish' ? 'text-down' : 'text-muted'"
-                      x-text="item.direction === 'bullish' ? '偏多' : item.direction === 'bearish' ? '偏空' : '中性'"></span>
-              </td>
-              <td>
-                <span class="badge"
-                      :class="item.confidence === 'high' ? 'badge-high' : item.confidence === 'medium' ? 'badge-medium' : 'badge-low'"
-                      x-text="item.confidence === 'high' ? '高' : item.confidence === 'medium' ? '中' : '低'"></span>
-              </td>
-              <td class="caption" style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
-                  x-text="item.catalyst"></td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-
-      <div x-show="history.length === 0" style="text-align:center; padding:48px; color:var(--color-ink-muted-48);">
-        暂无历史记录
+  <!-- History -->
+  <section style="padding:0 0 24px;">
+    <div class="container">
+      <div class="card">
+        <div class="card__header">
+          <div class="card__title">
+            <div class="card__title-icon" style="background:var(--text-muted);"></div>
+            历史分析记录
+          </div>
+          <div class="card__subtitle" x-text="history.length + '条'"></div>
+        </div>
+        <div class="card__body card__body--flush">
+          <div style="max-height:400px; overflow-y:auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>目标</th>
+                  <th>类型</th>
+                  <th>方向</th>
+                  <th>置信度</th>
+                  <th>催化剂</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="item in history" :key="item.id">
+                  <tr>
+                    <td class="mono text-muted" x-text="item.timestamp ? item.timestamp.substring(5, 16) : ''"></td>
+                    <td class="font-semibold" x-text="item.target"></td>
+                    <td class="text-sm" x-text="item.analysis_type === 'global_scan' ? '全局扫描' : item.analysis_type === 'composite' ? '个股分析' : '板块分析'"></td>
+                    <td>
+                      <span :class="item.direction === 'bullish' ? 'text-up' : item.direction === 'bearish' ? 'text-down' : 'text-muted'"
+                            x-text="item.direction === 'bullish' ? '偏多' : item.direction === 'bearish' ? '偏空' : '中性'"></span>
+                    </td>
+                    <td>
+                      <span class="badge"
+                            :class="item.confidence === 'high' ? 'badge--high' : item.confidence === 'medium' ? 'badge--medium' : 'badge--muted'"
+                            x-text="item.confidence === 'high' ? '高' : item.confidence === 'medium' ? '中' : '低'"></span>
+                    </td>
+                    <td class="text-sm text-muted" style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                        x-text="item.catalyst"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+            <div x-show="history.length === 0" class="empty-state">
+              <div class="empty-state__text">暂无历史记录</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -137,7 +146,6 @@
 function analysisPage() {
   return {
     loading: false,
-    mode: 'global',
     latest: null,
     history: [],
 
@@ -149,10 +157,7 @@ function analysisPage() {
         if (data.length > 0) {
           const raw = data[0];
           try {
-            this.latest = {
-              ...raw,
-              top_picks: JSON.parse(raw.key_metrics || '[]'),
-            };
+            this.latest = { ...raw, top_picks: JSON.parse(raw.key_metrics || '[]') };
           } catch (e) {
             this.latest = raw;
           }

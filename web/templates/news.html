@@ -1,62 +1,60 @@
 {% extends "base.html" %}
 
 {% block title %}消息 — AI产业链监控{% endblock %}
-{% block page_title %}消息{% endblock %}
-
-{% block subnav %}
-<a href="#" class="sub-nav__link" @click.prevent="filter='all'" :style="filter==='all'?'color:var(--color-primary)':''">全部</a>
-<a href="#" class="sub-nav__link" @click.prevent="filter='cls'" :style="filter==='cls'?'color:var(--color-primary)':''">财联社</a>
-<a href="#" class="sub-nav__link" @click.prevent="filter='eastmoney'" :style="filter==='eastmoney'?'color:var(--color-primary)':''">东方财富</a>
-<a href="#" class="sub-nav__link" @click.prevent="filter='cninfo'" :style="filter==='cninfo'?'color:var(--color-primary)':''">公告</a>
-{% endblock %}
 
 {% block content %}
 <div x-data="newsPage()" x-init="load()">
 
-  <!-- News Tile (light) -->
-  <section class="tile tile-parchment" style="padding-top:48px;">
-    <div class="container" style="max-width:980px;">
+  <section style="padding:16px 0 24px;">
+    <div class="container">
+      <div class="card">
+        <div class="card__header">
+          <div class="card__title">
+            <div class="card__title-icon" style="background:var(--accent);"></div>
+            行业新闻
+          </div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div class="filter-tabs">
+              <button class="filter-tab" :class="filter==='all' && 'active'" @click="filter='all'">全部</button>
+              <button class="filter-tab" :class="filter==='cls' && 'active'" @click="filter='cls'">财联社</button>
+              <button class="filter-tab" :class="filter==='eastmoney' && 'active'" @click="filter='eastmoney'">东方财富</button>
+              <button class="filter-tab" :class="filter==='cninfo' && 'active'" @click="filter='cninfo'">公告</button>
+            </div>
+            <button class="btn" @click="load()">
+              <i class="fa-solid fa-rotate" style="font-size:10px;"></i> 刷新
+            </button>
+          </div>
+        </div>
+        <div class="card__body card__body--flush">
+          <div x-show="loading" class="loading"><span class="spinner"></span>加载中...</div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:32px;">
-        <div class="display-md">行业新闻</div>
-        <button class="btn-primary" @click="load()">
-          <i class="fa-solid fa-rotate"></i> 刷新
-        </button>
-      </div>
-
-      <div x-show="loading" style="text-align:center; padding:48px; color:var(--color-ink-muted-48);">
-        加载中...
-      </div>
-
-      <div x-show="!loading">
-        <template x-for="item in filteredNews" :key="item.id">
-          <div class="card animate-in" style="margin-bottom:16px; cursor:default;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
-              <div style="flex:1;">
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-                  <span class="badge"
-                        :class="item.relevance === 'high' ? 'badge-high' : 'badge-medium'"
-                        x-text="item.source === 'cls_telegraph' ? '财联社' : item.source === 'cninfo' ? '公告' : '东方财富'"></span>
-                  <span class="badge" :class="'badge-' + (item.relevance === 'high' ? 'high' : 'low')"
-                        x-text="item.relevance === 'high' ? '高相关' : '中相关'"></span>
-                  <span x-show="item.ai_direction" class="badge badge-medium"
-                        x-text="item.ai_direction === 'bullish' ? '📈 利好' : item.ai_direction === 'bearish' ? '📉 利空' : '➡️ 中性'"></span>
+          <div x-show="!loading" style="max-height:600px; overflow-y:auto;">
+            <template x-for="item in filteredNews" :key="item.id">
+              <div class="news-item animate-in">
+                <div style="flex:1; min-width:0;">
+                  <div class="news-item__badges">
+                    <span class="badge badge--accent"
+                          x-text="item.source === 'cls_telegraph' ? '财联社' : item.source === 'cninfo' ? '公告' : '东方财富'"></span>
+                    <span class="badge" :class="item.relevance === 'high' ? 'badge--warning' : 'badge--muted'"
+                          x-text="item.relevance === 'high' ? '高相关' : '中相关'"></span>
+                    <span x-show="item.ai_direction" class="badge"
+                          :class="item.ai_direction === 'bullish' ? 'badge--up' : item.ai_direction === 'bearish' ? 'badge--down' : 'badge--muted'"
+                          x-text="item.ai_direction === 'bullish' ? '利好' : item.ai_direction === 'bearish' ? '利空' : '中性'"></span>
+                  </div>
+                  <a :href="item.url || '#'" target="_blank" class="news-item__title" x-text="item.title"></a>
+                  <div x-show="item.ai_reason" class="news-item__reason" x-text="item.ai_reason"></div>
                 </div>
-                <a :href="item.url || '#'" target="_blank" class="body-strong" style="display:block; margin-bottom:6px;"
-                   x-text="item.title"></a>
-                <div x-show="item.ai_reason" class="caption" style="color:var(--color-ink-muted-48);"
-                     x-text="item.ai_reason"></div>
+                <div class="news-item__time" x-text="item.date || ''"></div>
               </div>
-              <div class="fine-print" style="white-space:nowrap; padding-top:4px;" x-text="item.date || ''"></div>
+            </template>
+
+            <div x-show="filteredNews.length === 0" class="empty-state">
+              <div class="empty-state__icon"><i class="fa-solid fa-newspaper"></i></div>
+              <div class="empty-state__text">暂无相关新闻</div>
             </div>
           </div>
-        </template>
-
-        <div x-show="filteredNews.length === 0" style="text-align:center; padding:48px; color:var(--color-ink-muted-48);">
-          暂无相关新闻
         </div>
       </div>
-
     </div>
   </section>
 
