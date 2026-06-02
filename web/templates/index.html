@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}AI产业链监控 — 总览{% endblock %}
+{% block page_title %}总览{% endblock %}
+
+{% block subnav %}
+<a href="#sectors" class="sub-nav__link">板块</a>
+<a href="#overseas" class="sub-nav__link">海外</a>
+<a href="#upstream" class="sub-nav__link">上游</a>
+<a href="#signals" class="sub-nav__link">信号</a>
+{% endblock %}
+
+{% block content %}
+<div x-data="dashboard()" x-init="load()">
+
+  <!-- Hero Tile (dark) -->
+  <section class="tile tile-dark" style="padding-top:48px; padding-bottom:48px;">
+    <div class="container" style="max-width:1440px;">
+      <div class="tagline" style="color: var(--color-primary-on-dark); margin-bottom: 12px;">
+        AI产业链智能监控
+      </div>
+      <div class="display-lg" style="margin-bottom: 24px;">
+        多维信号 · 提前布局
+      </div>
+      <div class="lead" style="color: var(--color-body-muted); max-width: 600px; margin: 0 auto 32px;">
+        6层提前信号体系，从上游产业数据到AI关联分析，覆盖产业链全链路
+      </div>
+      <div class="data-grid data-grid-4" style="max-width: 800px; margin: 0 auto;">
+        <div class="stat-card" style="background: var(--color-surface-tile-2); border-color: rgba(255,255,255,0.06);">
+          <div class="stat-card__label" style="color: var(--color-body-muted);">监控标的</div>
+          <div class="stat-card__value" style="color: #fff;">14</div>
+          <div class="stat-card__change" style="color: var(--color-primary-on-dark);">只A股</div>
+        </div>
+        <div class="stat-card" style="background: var(--color-surface-tile-2); border-color: rgba(255,255,255,0.06);">
+          <div class="stat-card__label" style="color: var(--color-body-muted);">海外龙头</div>
+          <div class="stat-card__value" style="color: #fff;">6</div>
+          <div class="stat-card__change" style="color: var(--color-primary-on-dark);">只美股</div>
+        </div>
+        <div class="stat-card" style="background: var(--color-surface-tile-2); border-color: rgba(255,255,255,0.06);">
+          <div class="stat-card__label" style="color: var(--color-body-muted);">信号维度</div>
+          <div class="stat-card__value" style="color: #fff;">6</div>
+          <div class="stat-card__change" style="color: var(--color-primary-on-dark);">层信号</div>
+        </div>
+        <div class="stat-card" style="background: var(--color-surface-tile-2); border-color: rgba(255,255,255,0.06);">
+          <div class="stat-card__label" style="color: var(--color-body-muted);">数据源</div>
+          <div class="stat-card__value" style="color: #fff;">10+</div>
+          <div class="stat-card__change" style="color: var(--color-primary-on-dark);">个渠道</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sector Tiles (light) -->
+  <section id="sectors" class="tile tile-parchment">
+    <div class="container" style="max-width:1440px;">
+      <div class="display-md" style="margin-bottom: 48px;">板块行情</div>
+      <template x-if="loading">
+        <div class="lead" style="color: var(--color-ink-muted-48);">加载中...</div>
+      </template>
+      <div class="data-grid data-grid-3" style="max-width:1000px; margin:0 auto;">
+        <template x-for="(data, sector) in sectors" :key="sector">
+          <div class="card animate-in" style="cursor:default;">
+            <div class="body-strong" style="margin-bottom: 12px;" x-text="sector"></div>
+            <div class="stat-card__change" :class="data.avg_change >= 0 ? 'text-up' : 'text-down'"
+                 style="font-size:24px; font-weight:600; margin-bottom:12px;">
+              <span x-text="(data.avg_change >= 0 ? '+' : '') + data.avg_change.toFixed(2) + '%'"></span>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              <template x-for="stock in data.stocks" :key="stock.code">
+                <a :href="'/stock/' + stock.code"
+                   style="display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:var(--rounded-pill); font-size:12px; text-decoration:none;"
+                   :class="stock.change_pct >= 0 ? 'bg-up text-up' : 'bg-down text-down'">
+                  <span x-text="stock.name"></span>
+                  <span x-text="(stock.change_pct >= 0 ? '+' : '') + stock.change_pct.toFixed(1) + '%'"></span>
+                </a>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </section>
+
+  <!-- Overseas Tile (dark) -->
+  <section id="overseas" class="tile tile-dark">
+    <div class="container" style="max-width:1440px;">
+      <div class="display-md" style="margin-bottom: 12px; color: #fff;">海外龙头</div>
+      <div class="lead" style="color: var(--color-body-muted); margin-bottom: 48px;">
+        隔夜异动 → A股联动预警
+      </div>
+      <div class="data-grid data-grid-6" style="max-width:1200px; margin:0 auto;">
+        <template x-for="stock in overseas" :key="stock.symbol">
+          <div class="card-dark animate-in" style="text-align:center;">
+            <div class="caption-strong" style="color: var(--color-body-muted); margin-bottom:4px;" x-text="stock.symbol"></div>
+            <div class="body-strong" style="color:#fff; margin-bottom:8px;" x-text="stock.name"></div>
+            <div style="font-size:21px; font-weight:600; color:#fff; margin-bottom:4px;"
+                 x-text="'$' + (stock.close || 0).toFixed(2)"></div>
+            <div class="stat-card__change"
+                 :class="stock.change_pct >= 0 ? 'text-up' : 'text-down'"
+                 style="font-size:16px;"
+                 x-text="(stock.change_pct >= 0 ? '+' : '') + (stock.change_pct || 0).toFixed(1) + '%'"></div>
+            <div class="fine-print" style="margin-top:8px; color: var(--color-body-muted);">
+              → <span x-text="stock.affects ? stock.affects.join(', ') : ''"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </section>
+
+  <!-- Upstream Tile (light) -->
+  <section id="upstream" class="tile tile-light">
+    <div class="container" style="max-width:1440px;">
+      <div class="display-md" style="margin-bottom: 12px;">上游产业数据</div>
+      <div class="lead" style="color: var(--color-ink-muted-48); margin-bottom: 48px;">
+        领先指标 · 提前3-6个月
+      </div>
+      <div id="upstream-chart" class="chart-container" style="max-width:900px; margin:0 auto; height:300px;"></div>
+      <div style="margin-top:24px; text-align:center;">
+        <a href="/api/upstream" class="caption text-primary" style="font-size:14px;">查看原始数据 →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Signals Tile (dark) -->
+  <section id="signals" class="tile tile-dark-2">
+    <div class="container" style="max-width:1440px;">
+      <div class="display-md" style="margin-bottom: 12px; color: #fff;">最新信号</div>
+      <div class="lead" style="color: var(--color-body-muted); margin-bottom: 48px;">
+        多维信号实时推送
+      </div>
+      <div style="max-width:900px; margin:0 auto;">
+        <table class="data-table" style="color: #fff;">
+          <thead>
+            <tr>
+              <th style="color: var(--color-body-muted); border-color: rgba(255,255,255,0.1);">级别</th>
+              <th style="color: var(--color-body-muted); border-color: rgba(255,255,255,0.1);">信号</th>
+              <th style="color: var(--color-body-muted); border-color: rgba(255,255,255,0.1);">详情</th>
+              <th style="color: var(--color-body-muted); border-color: rgba(255,255,255,0.1);">时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="sig in recent_signals" :key="sig.id">
+              <tr>
+                <td style="border-color: rgba(255,255,255,0.06);">
+                  <span class="badge"
+                        :class="{
+                          'badge-critical': sig.severity === 'critical',
+                          'badge-high': sig.severity === 'high',
+                          'badge-medium': sig.severity === 'medium',
+                          'badge-low': sig.severity === 'low'
+                        }"
+                        x-text="sig.severity === 'critical' ? '紧急' : sig.severity === 'high' ? '重要' : sig.severity === 'medium' ? '关注' : '信息'">
+                  </span>
+                </td>
+                <td class="body-strong" style="border-color: rgba(255,255,255,0.06);" x-text="sig.title"></td>
+                <td class="caption" style="color: var(--color-body-muted); border-color: rgba(255,255,255,0.06);" x-text="sig.detail"></td>
+                <td class="fine-print" style="border-color: rgba(255,255,255,0.06);" x-text="sig.timestamp ? sig.timestamp.substring(5, 16) : ''"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+        <div x-show="recent_signals.length === 0" style="text-align:center; color: var(--color-body-muted); padding: 32px;">
+          暂无信号
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Northbound Tile (light) -->
+  <section class="tile tile-parchment">
+    <div class="container" style="max-width:980px;">
+      <div class="display-md" style="margin-bottom: 48px;">北向资金</div>
+      <div class="data-grid data-grid-3">
+        <div class="stat-card">
+          <div class="stat-card__label">沪股通净流入</div>
+          <div class="stat-card__value" :class="northbound.hgt_net >= 0 ? 'text-up' : 'text-down'"
+               x-text="northbound.hgt_net ? (northbound.hgt_net / 10000).toFixed(1) + '亿' : 'N/A'"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__label">深股通净流入</div>
+          <div class="stat-card__value" :class="northbound.sgt_net >= 0 ? 'text-up' : 'text-down'"
+               x-text="northbound.sgt_net ? (northbound.sgt_net / 10000).toFixed(1) + '亿' : 'N/A'"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__label">合计净流入</div>
+          <div class="stat-card__value" :class="northbound.total_net >= 0 ? 'text-up' : 'text-down'"
+               x-text="northbound.total_net_yi ? northbound.total_net_yi + '亿' : 'N/A'"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Inventory Tile (dark) -->
+  <section class="tile tile-dark">
+    <div class="container" style="max-width:980px;">
+      <div class="display-md" style="margin-bottom: 48px; color: #fff;">库存数据</div>
+      <div class="data-grid" style="grid-template-columns: 1fr 1fr;">
+        <div class="card-dark" style="text-align:center;">
+          <div class="caption-strong" style="color: var(--color-body-muted); margin-bottom:8px;">SHFE 锡库存</div>
+          <div style="font-size:34px; font-weight:600; color:#fff;"
+               x-text="inventory.tin && inventory.tin.latest ? inventory.tin.latest.toFixed(0) + ' 吨' : 'N/A'"></div>
+          <div class="stat-card__change" style="margin-top:8px;"
+               :class="inventory.tin && inventory.tin.trend === 'declining' ? 'text-up' : 'text-down'"
+               x-text="inventory.tin ? (inventory.tin.trend === 'declining' ? '持续下降 ↓' : inventory.tin.trend === 'rising' ? '持续上升 ↑' : '震荡 ↔') : ''"></div>
+        </div>
+        <div class="card-dark" style="text-align:center;">
+          <div class="caption-strong" style="color: var(--color-body-muted); margin-bottom:8px;">SHFE 铜库存</div>
+          <div style="font-size:34px; font-weight:600; color:#fff;"
+               x-text="inventory.copper && inventory.copper.latest ? inventory.copper.latest.toFixed(0) + ' 吨' : 'N/A'"></div>
+          <div class="stat-card__change" style="margin-top:8px;"
+               :class="inventory.copper && inventory.copper.trend === 'declining' ? 'text-up' : 'text-down'"
+               x-text="inventory.copper ? (inventory.copper.trend === 'declining' ? '持续下降 ↓' : inventory.copper.trend === 'rising' ? '持续上升 ↑' : '震荡 ↔') : ''"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function dashboard() {
+  return {
+    loading: true,
+    sectors: {},
+    overseas: [],
+    upstream: [],
+    northbound: {},
+    inventory: {},
+    recent_signals: [],
+
+    async load() {
+      try {
+        const r = await fetch('/api/dashboard');
+        const d = await r.json();
+        this.sectors = d.sectors || {};
+        this.overseas = d.overseas || [];
+        this.northbound = d.northbound || {};
+        this.inventory = d.inventory || {};
+        this.recent_signals = d.recent_signals || [];
+        this.loading = false;
+
+        this.$nextTick(() => this.renderUpstreamChart());
+      } catch (e) {
+        console.error('Dashboard load error:', e);
+        this.loading = false;
+      }
+    },
+
+    async renderUpstreamChart() {
+      try {
+        const r = await fetch('/api/upstream');
+        const data = await r.json();
+        if (!data || data.length === 0) return;
+
+        const chart = echarts.init(document.getElementById('upstream-chart'));
+        const tsmc = data.filter(d => d.source === 'tsmc').sort((a, b) => a.date.localeCompare(b.date));
+
+        if (tsmc.length > 0) {
+          chart.setOption({
+            backgroundColor: 'transparent',
+            title: { text: 'TSMC月度营收 (TWD百万)', left: 'center', top: 10,
+                     textStyle: { color: '#1d1d1f', fontSize: 16, fontWeight: 600, fontFamily: 'Inter' } },
+            tooltip: { trigger: 'axis' },
+            xAxis: { type: 'category', data: tsmc.map(d => d.date),
+                     axisLine: { lineStyle: { color: '#e0e0e0' } },
+                     axisLabel: { color: '#7a7a7a', fontSize: 12 } },
+            yAxis: { type: 'value', splitLine: { lineStyle: { color: '#f0f0f0' } },
+                     axisLabel: { color: '#7a7a7a', fontSize: 12 } },
+            series: [{
+              type: 'bar',
+              data: tsmc.map(d => d.value),
+              itemStyle: { color: '#0066cc', borderRadius: [4, 4, 0, 0] },
+              barWidth: '60%',
+            }],
+            grid: { left: 60, right: 30, top: 50, bottom: 30 },
+          });
+          window.addEventListener('resize', () => chart.resize());
+        }
+      } catch (e) {
+        console.error('Upstream chart error:', e);
+      }
+    }
+  };
+}
+</script>
+{% endblock %}

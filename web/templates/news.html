@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}消息 — AI产业链监控{% endblock %}
+{% block page_title %}消息{% endblock %}
+
+{% block subnav %}
+<a href="#" class="sub-nav__link" @click.prevent="filter='all'" :style="filter==='all'?'color:var(--color-primary)':''">全部</a>
+<a href="#" class="sub-nav__link" @click.prevent="filter='cls'" :style="filter==='cls'?'color:var(--color-primary)':''">财联社</a>
+<a href="#" class="sub-nav__link" @click.prevent="filter='eastmoney'" :style="filter==='eastmoney'?'color:var(--color-primary)':''">东方财富</a>
+<a href="#" class="sub-nav__link" @click.prevent="filter='cninfo'" :style="filter==='cninfo'?'color:var(--color-primary)':''">公告</a>
+{% endblock %}
+
+{% block content %}
+<div x-data="newsPage()" x-init="load()">
+
+  <!-- News Tile (light) -->
+  <section class="tile tile-parchment" style="padding-top:48px;">
+    <div class="container" style="max-width:980px;">
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:32px;">
+        <div class="display-md">行业新闻</div>
+        <button class="btn-primary" @click="load()">
+          <i class="fa-solid fa-rotate"></i> 刷新
+        </button>
+      </div>
+
+      <div x-show="loading" style="text-align:center; padding:48px; color:var(--color-ink-muted-48);">
+        加载中...
+      </div>
+
+      <div x-show="!loading">
+        <template x-for="item in filteredNews" :key="item.id">
+          <div class="card animate-in" style="margin-bottom:16px; cursor:default;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
+              <div style="flex:1;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                  <span class="badge"
+                        :class="item.relevance === 'high' ? 'badge-high' : 'badge-medium'"
+                        x-text="item.source === 'cls_telegraph' ? '财联社' : item.source === 'cninfo' ? '公告' : '东方财富'"></span>
+                  <span class="badge" :class="'badge-' + (item.relevance === 'high' ? 'high' : 'low')"
+                        x-text="item.relevance === 'high' ? '高相关' : '中相关'"></span>
+                  <span x-show="item.ai_direction" class="badge badge-medium"
+                        x-text="item.ai_direction === 'bullish' ? '📈 利好' : item.ai_direction === 'bearish' ? '📉 利空' : '➡️ 中性'"></span>
+                </div>
+                <a :href="item.url || '#'" target="_blank" class="body-strong" style="display:block; margin-bottom:6px;"
+                   x-text="item.title"></a>
+                <div x-show="item.ai_reason" class="caption" style="color:var(--color-ink-muted-48);"
+                     x-text="item.ai_reason"></div>
+              </div>
+              <div class="fine-print" style="white-space:nowrap; padding-top:4px;" x-text="item.date || ''"></div>
+            </div>
+          </div>
+        </template>
+
+        <div x-show="filteredNews.length === 0" style="text-align:center; padding:48px; color:var(--color-ink-muted-48);">
+          暂无相关新闻
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function newsPage() {
+  return {
+    loading: true,
+    news: [],
+    filter: 'all',
+
+    get filteredNews() {
+      if (this.filter === 'all') return this.news;
+      return this.news.filter(n => n.source === this.filter || n.source === this.filter + '_telegraph');
+    },
+
+    async load() {
+      this.loading = true;
+      try {
+        const r = await fetch('/api/news?limit=50');
+        this.news = await r.json();
+      } catch (e) {
+        console.error('News load error:', e);
+      }
+      this.loading = false;
+    }
+  };
+}
+</script>
+{% endblock %}
