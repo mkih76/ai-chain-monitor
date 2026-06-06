@@ -139,6 +139,11 @@ def _chain_score(chain):
 # ============================================================
 def _llm_reason_causal_chain(sector, signals):
     """调用LLM对板块信号组合进行因果推理"""
+    # 清除所有代理环境变量，避免被拦截
+    for k in list(os.environ.keys()):
+        if 'proxy' in k.lower():
+            os.environ.pop(k, None)
+
     api_base = config.AI_ENGINE.get("api_base", "")
     api_key = config.AI_ENGINE.get("api_key", "")
     model = config.AI_ENGINE.get("model", "MiniMax-M2.7")
@@ -185,11 +190,12 @@ def _llm_reason_causal_chain(sector, signals):
                 {"role": "system", "content": CAUSAL_CHAIN_PROMPT},
                 {"role": "user", "content": user_msg},
             ],
-            "max_tokens": 1000,
+            "max_tokens": 1200,
             "temperature": 0.2,
         }
-
-        resp = req.post(url, json=payload, headers=headers, timeout=45)
+        session = req.Session()
+        session.trust_env = False
+        resp = session.post(url, json=payload, headers=headers, timeout=45)
 
         if resp.status_code == 200:
             data = resp.json()

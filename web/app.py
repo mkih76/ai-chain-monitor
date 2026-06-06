@@ -61,10 +61,10 @@ def api_stocks():
     from db import init_db, get_stock_history
     from collectors.institutional_collector import fetch_valuation
     import config
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     init_db()
 
-    result = []
-    for code, (name, sector) in config.WATCHLIST.items():
+    def fetch_one(code, name, sector):
         history = get_stock_history(code, days=5)
         val = fetch_valuation(code)
         latest = history[0] if history else {}
@@ -72,7 +72,7 @@ def api_stocks():
         chg = 0
         if latest and prev and prev.get("close", 0) > 0:
             chg = round((latest["close"] - prev["close"]) / prev["close"] * 100, 2)
-        result.append({
+        return {
             "code": code,
             "name": name,
             "sector": sector,
@@ -83,7 +83,17 @@ def api_stocks():
             "pe_ttm": val.get("pe_ttm") if val else None,
             "pb": val.get("pb") if val else None,
             "total_mv": val.get("total_mv") if val else None,
-        })
+        }
+
+    items = list(config.WATCHLIST.items())
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {ex.submit(fetch_one, code, name, sector): code for code, (name, sector) in items}
+        result = []
+        for f in as_completed(futures):
+            result.append(f.result())
+
+    # 按涨跌幅降序
+    result.sort(key=lambda x: x["change_pct"], reverse=True)
     return jsonify(result)
 
 @app.route("/api/stock/<code>/kline")
