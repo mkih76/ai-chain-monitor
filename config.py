@@ -105,15 +105,19 @@ CLS_TELEGRAPH = {
 # === AI分析引擎配置 ===
 AI_ENGINE = {
     "enabled": True,
-    # MiMo LLM Proxy (本地免费)
+    # OpenAI兼容API (zyapi)
+    "api_base": os.environ.get("AI_API_BASE", "https://zyapi.tuluo.top:8888/v1"),
+    "api_key": os.environ.get("AI_API_KEY", "pk_ZN0d6CR4JrWU1hz5RralZEKr6RarK9YFSsZ1F_F9ILg"),
+    "model": os.environ.get("AI_MODEL", "deepseek-v4-pro"),
+    # MiMo LLM Proxy (VPS本地, 可选)
     "mimo_proxy_url": os.environ.get("MIMO_PROXY_URL", "http://localhost:3001/open-apis/bot/chat"),
     "mimo_service_token": os.environ.get("MIMO_SERVICE_TOKEN", ""),
     "mimo_user_id": os.environ.get("MIMO_USER_ID", ""),
     "mimo_cookie": os.environ.get("MIMO_COOKIE", ""),
     # 分析参数
-    "max_news_per_batch": 20,       # 每批最多分析N条新闻
-    "confidence_threshold": "medium",  # 推送最低置信度
-    "multi_signal_min": 3,          # 多信号共振最低维度数
+    "max_news_per_batch": 20,
+    "confidence_threshold": "medium",
+    "multi_signal_min": 3,
 }
 
 # === 北向资金连续监控参数 ===

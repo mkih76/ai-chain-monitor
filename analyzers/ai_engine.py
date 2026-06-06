@@ -230,17 +230,19 @@ def _identify_gaps():
 
 def _try_ai_enhance(top_calls, risk_alerts):
     """
-    尝试调用MiMo Proxy增强分析（可选）
-    如果MiMo不可用，返回None，不影响整体功能
+    调用LLM增强分析（OpenAI兼容API）
+    支持 zyapi / DeepSeek / 任意 OpenAI 兼容 endpoint
     """
-    mimo_url = config.AI_ENGINE.get("mimo_proxy_url", "")
-    if not mimo_url or not config.AI_ENGINE.get("enabled"):
+    api_base = config.AI_ENGINE.get("api_base", "")
+    api_key = config.AI_ENGINE.get("api_key", "")
+    model = config.AI_ENGINE.get("model", "deepseek-v4-pro")
+
+    if not api_base or not api_key or not config.AI_ENGINE.get("enabled"):
         return None
 
     try:
         import requests as req
 
-        # 构造prompt
         signal_summary = json.dumps(top_calls[:5], ensure_ascii=False, indent=2)
         risk_summary = json.dumps(risk_alerts[:3], ensure_ascii=False, indent=2)
 
@@ -260,16 +262,19 @@ def _try_ai_enhance(top_calls, risk_alerts):
 
 简洁回答，不超过200字。"""
 
-        # 尝试读取cookie
-        cookie = config.AI_ENGINE.get("mimo_cookie", "")
-        cookies = {}
-        if cookie:
-            cookies = {"serviceToken": cookie}
-
-        resp = req.post(mimo_url, json={
+        url = f"{api_base}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": model,
             "messages": [{"role": "user", "content": prompt}],
-            "stream": False,
-        }, cookies=cookies, timeout=15)
+            "max_tokens": 500,
+            "temperature": 0.3,
+        }
+
+        resp = req.post(url, json=payload, headers=headers, timeout=30)
 
         if resp.status_code == 200:
             data = resp.json()
@@ -277,8 +282,10 @@ def _try_ai_enhance(top_calls, risk_alerts):
                       .get("message", {}).get("content", ""))
             if content:
                 return content
-    except Exception:
-        pass
+        else:
+            print(f"  ⚠ AI API返回 {resp.status_code}: {resp.text[:100]}")
+    except Exception as e:
+        print(f"  ⚠ AI调用异常: {e}")
 
     return None
 
