@@ -207,6 +207,14 @@ def api_news_categories():
     return jsonify([dict(r) for r in rows])
 
 
+@app.route("/api/causal-chains")
+def api_causal_chains():
+    """因果传导链"""
+    from analyzers.causal_chain import generate_causal_chains
+    chains = generate_causal_chains()
+    return jsonify(chains)
+
+
 @app.route("/api/materials")
 def api_materials():
     """材料价格数据"""
