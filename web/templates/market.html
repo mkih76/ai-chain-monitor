@@ -102,61 +102,16 @@
     </div>
   </section>
 
-  <!-- Chain Flow -->
+  <!-- Signal Flow Chain -->
   <section style="padding:0 0 24px;">
     <div class="container">
       <div class="card">
         <div class="card__header">
-          <div class="card__title"><div class="card__title-icon"></div>产业链联动图</div>
-          <div class="card__subtitle">海外龙头 → 上游指标 → A股板块</div>
+          <div class="card__title"><div class="card__title-icon"></div>信号传导链</div>
+          <div class="card__subtitle">先行信号 → 产业链节点 → A股板块 · 红色=看空 绿色=看多 · 粗细=置信度</div>
         </div>
-        <div class="card__body">
-          <div class="flow-grid">
-            <div class="flow-col">
-              <div class="flow-col__title">海外龙头</div>
-              <template x-for="s in overseas" :key="s.symbol">
-                <div class="flow-node animate-in">
-                  <div>
-                    <div class="flow-node__name" x-text="s.name"></div>
-                    <div class="flow-node__affects" x-text="'→ ' + (s.affects || []).join(' / ')"></div>
-                  </div>
-                  <div class="flow-node__val" :class="(s.change_pct||0) >= 0 ? 'text-up' : 'text-down'"
-                       x-text="((s.change_pct||0) >= 0 ? '+' : '') + (s.change_pct||0).toFixed(1) + '%'"></div>
-                </div>
-              </template>
-            </div>
-            <div class="flow-arrow"><i class="fa-solid fa-arrow-right"></i></div>
-            <div class="flow-col">
-              <div class="flow-col__title">上游指标</div>
-              <div class="flow-node">
-                <div><div class="flow-node__name">SHFE锡库存</div><div class="flow-node__affects">焊接/封装材料</div></div>
-                <div class="flow-node__val text-up" x-text="inventoryLatest('tin')"></div>
-              </div>
-              <div class="flow-node">
-                <div><div class="flow-node__name">SHFE铜库存</div><div class="flow-node__affects">PCB/铜缆材料</div></div>
-                <div class="flow-node__val text-up" x-text="inventoryLatest('copper')"></div>
-              </div>
-              <div class="flow-node">
-                <div><div class="flow-node__name">沪铜期货</div><div class="flow-node__affects">成本传导</div></div>
-                <div class="flow-node__val" x-text="materialLatest('copper')"></div>
-              </div>
-            </div>
-            <div class="flow-arrow"><i class="fa-solid fa-arrow-right"></i></div>
-            <div class="flow-col">
-              <div class="flow-col__title">A股板块</div>
-              <template x-for="(data, sector) in sectors" :key="sector">
-                <div class="flow-node animate-in" style="cursor:pointer;" @click="window.location='/stock/' + data.stocks[0].code">
-                  <div>
-                    <div class="flow-node__name" x-text="sector"></div>
-                    <div class="flow-node__affects" x-text="data.stocks.map(s => s.name).join(' / ')"></div>
-                  </div>
-                  <div class="flow-node__val mono" :class="data.avg_change >= 0 ? 'text-up' : 'text-down'">
-                    <span x-text="(data.avg_change >= 0 ? '+' : '') + data.avg_change.toFixed(2) + '%'"></span>
-                  </div>
-                </div>
-              </template>
-            </div>
-          </div>
+        <div class="card__body card__body--flush">
+          <div id="signal-flow-chart" style="width:100%; height:400px;"></div>
         </div>
       </div>
     </div>
@@ -198,6 +153,7 @@ function market() {
         this.$nextTick(() => {
           this.renderInventoryChart();
           this.renderPriceChart();
+          this.renderSignalFlow(sigData.signals || []);
         });
       } catch (e) {
         console.error('Market load error:', e);
@@ -296,6 +252,79 @@ function market() {
         series: series.map((s, i) => ({ ...s, yAxisIndex: i < 2 ? 0 : 1 })),
       });
       window.addEventListener('resize', () => chart.resize());
+    },
+
+    renderSignalFlow(signals) {
+      const el = document.getElementById('signal-flow-chart');
+      if (!el || !signals || signals.length === 0) return;
+      const chart = echarts.init(el);
+
+      // 从信号中提取板块方向和置信度
+      const sectorMap = {};
+      const srcLabel = {inventory:'库存',capital:'资金',commodity:'商品',overseas:'海外',announcement:'公告',correlator:'共振'};
+      signals.forEach(s => {
+        const sectors = JSON.parse(s.target_sectors || '[]');
+        const conf = s.confidence || 0;
+        sectors.forEach(sec => {
+          if (!sectorMap[sec]) sectorMap[sec] = {bull:0, bear:0, max:0, srcs:new Set()};
+          if (s.direction==='bullish') sectorMap[sec].bull += conf;
+          else if (s.direction==='bearish') sectorMap[sec].bear += conf;
+          sectorMap[sec].max = Math.max(sectorMap[sec].max, conf);
+          sectorMap[sec].srcs.add(s.source);
+        });
+      });
+
+      const leftNodes = [
+        {key:'NVDA',name:'英伟达',affects:['光模块','服务器','PCB','封装']},
+        {key:'TSM',name:'台积电',affects:['封装','光模块']},
+        {key:'_inv',name:'SHFE库存',affects:['锡','铜','封装','PCB']},
+        {key:'_cap',name:'机构资金',affects:['锡','光模块','PCB']},
+      ];
+      const rightNodes = [
+        {key:'光模块',s:'中际旭创/新易盛'},{key:'服务器',s:'工业富联/浪潮信息'},
+        {key:'PCB',s:'深南电路/兴森科技'},{key:'封装',s:'长电科技/通富微电'},
+        {key:'液冷',s:'英维克'},{key:'国产算力',s:'寒武纪/海光信息'},
+        {key:'锡',s:'锡业股份'},{key:'铜',s:'紫金矿业'},
+      ];
+
+      const nodes = [], edges = [];
+      leftNodes.forEach((n,i) => {
+        nodes.push({name:n.key,x:80,y:50+i*95,symbolSize:35,symbol:'roundRect',
+          itemStyle:{color:'#3b82f6',borderColor:'#1e40af',borderWidth:2},
+          label:{show:true,formatter:n.name,fontSize:12,color:'#e2e8f0',position:'left'}});
+      });
+      rightNodes.forEach((n,i) => {
+        const sec=sectorMap[n.key];
+        let dir=0,conf=0,arrow='→';
+        if(sec){dir=sec.bull>sec.bear?1:sec.bear>sec.bull?-1:0;conf=sec.max;arrow=dir>0?'↑':dir<0?'↓':'→';}
+        const color=dir>0?'#059669':dir<0?'#dc2626':'#64748b';
+        nodes.push({name:n.key,x:600,y:30+i*50,symbolSize:30+conf*30,symbol:'circle',
+          itemStyle:{color,borderColor:'#1e293b',borderWidth:2},
+          label:{show:true,formatter:`${n.key} ${arrow}\n${(conf*100).toFixed(0)}%`,fontSize:11,color:'#e2e8f0',position:'right'}});
+        leftNodes.forEach(left => {
+          if(left.affects.includes(n.key)){
+            const si=sectorMap[n.key];
+            const d=si?(si.bull>si.bear?1:si.bear>si.bull?-1:0):0;
+            const c=si?si.max:0;
+            edges.push({source:left.key,target:n.key,
+              lineStyle:{color:d>0?'rgba(5,150,105,0.6)':d<0?'rgba(220,38,38,0.6)':'rgba(100,116,139,0.3)',
+                width:1+c*4,curveness:0.15+leftNodes.indexOf(left)*0.05}});
+          }
+        });
+      });
+
+      chart.setOption({
+        backgroundColor:'transparent',
+        tooltip:{formatter:p=>{
+          if(p.dataType!=='node')return '';
+          const sec=sectorMap[p.name];
+          if(!sec)return `<b>${p.name}</b>`;
+          return `<b>${p.name}</b><br/>看多:${sec.bull.toFixed(2)} 看空:${sec.bear.toFixed(2)}<br/>置信:${(sec.max*100).toFixed(0)}%<br/>来源:${[...sec.srcs].map(s=>srcLabel[s]||s).join('、')}`;
+        }},
+        series:[{type:'graph',layout:'none',roam:false,data:nodes,links:edges,lineStyle:{opacity:0.7},
+          emphasis:{lineStyle:{width:5,opacity:1}}}],
+      });
+      window.addEventListener('resize',()=>chart.resize());
     }
   };
 }
