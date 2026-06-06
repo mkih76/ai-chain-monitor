@@ -2,7 +2,7 @@
 AI产业链监控 Web平台 - Flask应用
 Apple设计语言风格
 """
-from flask import Flask, render_template, jsonify, Response
+from flask import Flask, render_template, jsonify, Response, redirect
 from flask_cors import CORS
 import sys, os, json
 from datetime import datetime
@@ -17,23 +17,36 @@ CORS(app)
 # ============================================================
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return redirect("/signal")
 
-@app.route("/news")
-def news_page():
-    return render_template("news.html")
+@app.route("/signal")
+def signal_page():
+    """①信号 — 决策核心"""
+    return render_template("signal.html")
 
-@app.route("/analysis")
-def analysis_page():
-    return render_template("analysis.html")
+@app.route("/market")
+def market_page():
+    """②市场 — 先行指标全景"""
+    return render_template("market.html")
 
-@app.route("/evolution")
-def evolution_page():
-    return render_template("evolution.html")
+@app.route("/report")
+def report_page():
+    """③报告 — AI研判+消息验证"""
+    return render_template("report.html")
+
+@app.route("/review")
+def review_page():
+    """④复盘 — 准确率+反馈"""
+    return render_template("review.html")
 
 @app.route("/stock/<code>")
 def stock_detail(code):
-    return render_template("stock.html", code=code)
+    return render_template("signal.html")  # 个股详情暂用信号页
+
+# 旧路径兼容
+@app.route("/radar")
+def radar_redirect():
+    return redirect("/signal")
 
 # ============================================================
 # REST API
@@ -299,12 +312,6 @@ def api_run_detect():
         "detected": len(signals),
         "message": f"检测完成，产生 {len(signals)} 个信号"
     })
-
-
-@app.route("/radar")
-def radar_page():
-    """信号雷达页面"""
-    return render_template("radar.html")
 
 
 @app.route("/api/report")

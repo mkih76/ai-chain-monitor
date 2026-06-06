@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block title %}复盘 — 信号准确率+反馈{% endblock %}
+
+{% block content %}
+<div x-data="reviewPage()" x-init="load()">
+
+  <!-- Header -->
+  <section style="padding:20px 0 12px;">
+    <div class="container">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h1 style="font-size:20px; font-weight:700; margin:0;">复盘</h1>
+          <div class="text-sm text-muted" style="margin-top:4px;">
+            信号准确率追踪 · 回测验证 · 系统校准
+          </div>
+        </div>
+        <button @click="runVerify()" class="btn btn--primary" :disabled="verifying"
+                style="font-size:11px; padding:6px 14px;">
+          <i class="fa-solid fa-check-double" :class="{'fa-spin': verifying}"></i>
+          <span x-text="verifying ? '验证中...' : '运行验证'"></span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Accuracy Dashboard -->
+  <section style="padding:0 0 16px;">
+    <div class="container">
+      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:16px;">
+        <div class="stat-card">
+          <div class="stat-card__value" :class="(stats.verified||0) > 0 ? 'text-up' : 'text-muted'"
+               x-text="stats.verified || 0"></div>
+          <div class="stat-card__label">验证正确</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__value" :class="(stats.invalidated||0) > 0 ? 'text-down' : 'text-muted'"
+               x-text="stats.invalidated || 0"></div>
+          <div class="stat-card__label">验证错误</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__value text-muted" x-text="stats.expired || 0"></div>
+          <div class="stat-card__label">已过期</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__value" :class="(stats.accuracy||0) > 60 ? 'text-up' : (stats.accuracy||0) > 0 ? 'text-down' : 'text-muted'"
+               x-text="stats.accuracy ? stats.accuracy + '%' : '—'"></div>
+          <div class="stat-card__label">总准确率</div>
+        </div>
+      </div>
+
+      <!-- Accuracy by Source -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div class="card">
+          <div class="card__header">
+            <div class="card__title"><div class="card__title-icon" style="background:var(--accent);"></div>按来源准确率</div>
+          </div>
+          <div class="card__body">
+            <template x-for="item in bySource" :key="item.source">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border);">
+                <div>
+                  <div style="font-weight:500; font-size:13px;" x-text="sourceName(item.source)"></div>
+                  <div class="text-xs text-muted" x-text="'验证:' + item.verified + ' 否定:' + item.invalidated"></div>
+                </div>
+                <div>
+                  <div style="width:100px; height:8px; background:var(--bg-tertiary); border-radius:4px; overflow:hidden;">
+                    <div :style="'width:' + item.accuracy + '%; height:100%; border-radius:4px;'"
+                         :class="item.accuracy > 60 ? 'bg-up' : item.accuracy > 0 ? 'bg-down' : 'bg-muted'"></div>
+                  </div>
+                  <div class="text-xs mono" style="text-align:right; margin-top:2px;" x-text="item.accuracy + '%'"></div>
+                </div>
+              </div>
+            </template>
+            <div x-show="bySource.length === 0" class="text-sm text-muted" style="padding:16px; text-align:center;">
+              暂无验证数据
+            </div>
+          </div>
+        </div>
+
+        <!-- Accuracy by Severity -->
+        <div class="card">
+          <div class="card__header">
+            <div class="card__title"><div class="card__title-icon" style="background:var(--warning);"></div>按等级准确率</div>
+          </div>
+          <div class="card__body">
+            <template x-for="item in bySeverity" :key="item.severity">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border);">
+                <div>
+                  <span class="signal-severity" :class="'severity-' + item.severity" x-text="item.severity" style="margin-right:8px;"></span>
+                  <span class="text-xs text-muted" x-text="'验证:' + item.verified + ' 否定:' + item.invalidated"></span>
+                </div>
+                <div>
+                  <div style="width:100px; height:8px; background:var(--bg-tertiary); border-radius:4px; overflow:hidden;">
+                    <div :style="'width:' + item.accuracy + '%; height:100%; border-radius:4px;'"
+                         :class="item.accuracy > 60 ? 'bg-up' : item.accuracy > 0 ? 'bg-down' : 'bg-muted'"></div>
+                  </div>
+                  <div class="text-xs mono" style="text-align:right; margin-top:2px;" x-text="item.accuracy + '%'"></div>
+                </div>
+              </div>
+            </template>
+            <div x-show="bySeverity.length === 0" class="text-sm text-muted" style="padding:16px; text-align:center;">
+              暂无验证数据
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Signal Lifecycle / Recent Verifications -->
+  <section style="padding:0 0 16px;">
+    <div class="container">
+      <div class="card">
+        <div class="card__header">
+          <div class="card__title"><div class="card__title-icon" style="background:var(--up);"></div>信号生命周期追踪</div>
+          <div class="card__subtitle">最近验证的信号 · ✓正确 / ✗错误</div>
+        </div>
+        <div class="card__body card__body--flush">
+          <template x-for="sig in recent" :key="sig.id">
+            <div style="padding:12px 16px; border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:center;">
+              <div style="width:24px; text-align:center; font-size:16px;">
+                <span :class="sig.status === 'verified' ? 'text-up' : 'text-down'"
+                      x-text="sig.status === 'verified' ? '✓' : '✗'"></span>
+              </div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:13px; font-weight:500;" x-text="sig.description || ''"></div>
+                <div style="display:flex; gap:10px; margin-top:4px; font-size:11px; color:var(--text-muted);">
+                  <span x-text="sig.source"></span>
+                  <span :class="sig.direction === 'bullish' ? 'text-up' : 'text-down'"
+                        x-text="sig.direction === 'bullish' ? '看多' : '看空'"></span>
+                  <span x-text="'创建: ' + (sig.timestamp||'').substring(5,10)"></span>
+                  <span x-text="'验证: ' + (sig.price_verified_at||'').substring(5,10)"></span>
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <div class="mono" :class="(sig.price_change_pct||0) >= 0 ? 'text-up' : 'text-down'"
+                     x-text="((sig.price_change_pct||0) >= 0 ? '+' : '') + (sig.price_change_pct||0).toFixed(1) + '%'"></div>
+                <span class="badge" :class="sig.severity === 'S1' ? 'badge--critical' : sig.severity === 'S2' ? 'badge--high' : 'badge--muted'"
+                      x-text="sig.severity"></span>
+              </div>
+            </div>
+          </template>
+          <div x-show="recent.length === 0" class="empty-state" style="padding:30px;">
+            <div class="empty-state__icon"><i class="fa-solid fa-rotate-left"></i></div>
+            <div class="empty-state__text">暂无验证记录</div>
+            <div class="text-xs text-muted" style="margin-top:8px;">信号创建72小时后自动验证，或点击「运行验证」手动触发</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Discovery / Calibration -->
+  <section style="padding:0 0 24px;">
+    <div class="container">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <!-- Discoveries -->
+        <div class="card">
+          <div class="card__header">
+            <div class="card__title"><div class="card__title-icon" style="background:#8b5cf6;"></div>新标的发现</div>
+          </div>
+          <div class="card__body">
+            <template x-for="d in discoveries" :key="d.code || d.symbol">
+              <div style="padding:8px 0; border-bottom:1px solid var(--border);">
+                <div style="font-weight:500; font-size:13px;" x-text="(d.name||'') + ' (' + (d.code||d.symbol||'') + ')'"></div>
+                <div class="text-xs text-muted" x-text="d.reason || ''"></div>
+              </div>
+            </template>
+            <div x-show="discoveries.length === 0" class="text-sm text-muted" style="padding:12px; text-align:center;">
+              暂无新发现
+            </div>
+          </div>
+        </div>
+
+        <!-- Calibration Tips -->
+        <div class="card">
+          <div class="card__header">
+            <div class="card__title"><div class="card__title-icon" style="background:#f59e0b;"></div>校准建议</div>
+          </div>
+          <div class="card__body">
+            <div class="text-sm text-muted" style="padding:12px;">
+              <div x-show="!stats.accuracy" style="text-align:center;">
+                需积累足够验证数据后才能给出校准建议
+              </div>
+              <template x-if="stats.accuracy">
+                <div>
+                  <div style="margin-bottom:8px;">基于当前 <span x-text="(stats.verified||0) + (stats.invalidated||0)"></span> 个验证样本：</div>
+                  <template x-for="tip in calibrationTips" :key="tip">
+                    <div style="padding:6px 0; border-bottom:1px solid var(--border);">· <span x-text="tip"></span></div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function reviewPage() {
+  return {
+    stats: {},
+    bySource: [],
+    bySeverity: [],
+    recent: [],
+    discoveries: [],
+    calibrationTips: [],
+    verifying: false,
+
+    async load() {
+      try {
+        const [statsRes, discRes] = await Promise.all([
+          fetch('/api/verify/stats'),
+          fetch('/api/discoveries')
+        ]);
+        const data = await statsRes.json();
+        this.stats = this._calcStats(data);
+        this.bySource = data.by_source || [];
+        this.bySeverity = data.by_severity || [];
+        this.recent = data.recent || [];
+        this.discoveries = await discRes.json();
+
+        // Generate calibration tips
+        this._genTips();
+      } catch (e) {
+        console.error('Review load error:', e);
+      }
+    },
+
+    _calcStats(data) {
+      const src = data.by_source || [];
+      let verified = 0, invalidated = 0;
+      src.forEach(s => { verified += s.verified; invalidated += s.invalidated; });
+      const total = verified + invalidated;
+      return {
+        verified, invalidated,
+        expired: 0,
+        accuracy: total > 0 ? Math.round(verified / total * 100) : null
+      };
+    },
+
+    _genTips() {
+      this.calibrationTips = [];
+      const acc = this.stats.accuracy;
+      if (acc === null) return;
+
+      if (acc < 50) {
+        this.calibrationTips.push('总体准确率偏低，建议提高信号置信度阈值');
+      }
+      this.bySource.forEach(s => {
+        if (s.accuracy < 40 && (s.verified + s.invalidated) >= 3) {
+          this.calibrationTips.push(s.source + ' 来源准确率仅' + s.accuracy + '%，建议降低该来源权重');
+        }
+        if (s.accuracy > 80 && (s.verified + s.invalidated) >= 3) {
+          this.calibrationTips.push(s.source + ' 来源准确率' + s.accuracy + '%，表现优秀，可适当提高权重');
+        }
+      });
+      if (this.calibrationTips.length === 0) {
+        this.calibrationTips.push('当前数据量不足，继续积累验证样本');
+      }
+    },
+
+    sourceName(src) {
+      return {inventory:'库存', capital:'资金', commodity:'商品', announcement:'公告',
+              overseas:'海外', correlator:'关联', news:'新闻'}[src] || src;
+    },
+
+    async runVerify() {
+      this.verifying = true;
+      try {
+        await fetch('/api/verify', { method: 'POST' });
+        await this.load();
+      } catch (e) {
+        console.error('Verify error:', e);
+      }
+      this.verifying = false;
+    }
+  };
+}
+</script>
+{% endblock %}

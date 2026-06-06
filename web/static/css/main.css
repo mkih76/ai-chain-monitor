@@ -87,6 +87,7 @@ a:hover { text-decoration: underline; }
 .bg-down { background: var(--down-bg); }
 .bg-up-dim { background: var(--up-dim); }
 .bg-down-dim { background: var(--down-dim); }
+.bg-muted { background: var(--text-muted); }
 
 /* ========== Layout ========== */
 .container {

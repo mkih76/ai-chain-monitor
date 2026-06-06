@@ -37,20 +37,17 @@
         <span>AI产业链监控</span>
       </a>
       <div class="nav__links">
-        <a href="/radar" class="nav__link {% if request.path == '/radar' %}active{% endif %}">
-          <i class="fa-solid fa-satellite-dish" style="font-size:11px; margin-right:4px;"></i>信号雷达
+        <a href="/signal" class="nav__link {% if request.path == '/signal' %}active{% endif %}">
+          <i class="fa-solid fa-satellite-dish" style="font-size:11px; margin-right:4px;"></i>信号
         </a>
-        <a href="/" class="nav__link {% if request.path == '/' %}active{% endif %}">
-          <i class="fa-solid fa-chart-line" style="font-size:11px; margin-right:4px;"></i>总览
+        <a href="/market" class="nav__link {% if request.path == '/market' %}active{% endif %}">
+          <i class="fa-solid fa-chart-column" style="font-size:11px; margin-right:4px;"></i>市场
         </a>
-        <a href="/news" class="nav__link {% if request.path == '/news' %}active{% endif %}">
-          <i class="fa-solid fa-newspaper" style="font-size:11px; margin-right:4px;"></i>消息
+        <a href="/report" class="nav__link {% if request.path == '/report' %}active{% endif %}">
+          <i class="fa-solid fa-file-lines" style="font-size:11px; margin-right:4px;"></i>报告
         </a>
-        <a href="/analysis" class="nav__link {% if request.path == '/analysis' %}active{% endif %}">
-          <i class="fa-solid fa-brain" style="font-size:11px; margin-right:4px;"></i>AI分析
-        </a>
-        <a href="/evolution" class="nav__link {% if request.path == '/evolution' %}active{% endif %}">
-          <i class="fa-solid fa-dna" style="font-size:11px; margin-right:4px;"></i>进化
+        <a href="/review" class="nav__link {% if request.path == '/review' %}active{% endif %}">
+          <i class="fa-solid fa-rotate-left" style="font-size:11px; margin-right:4px;"></i>复盘
         </a>
       </div>
       <div class="nav__clock" id="nav-clock"></div>

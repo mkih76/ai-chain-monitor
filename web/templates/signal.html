@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block title %}信号 — AI产业链先行信号{% endblock %}
+
+{% block content %}
+<div x-data="radar()" x-init="load()">
+
+  <!-- Header: Signal Pipeline Overview -->
+  <section style="padding: 20px 0 12px;">
+    <div class="container">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div>
+          <h1 style="font-size:20px; font-weight:700; margin:0;">信号雷达</h1>
+          <div class="text-sm text-muted" style="margin-top:4px;">
+            先行信号检测 · 在新闻出来之前捕捉价格驱动因素
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <span class="text-xs text-muted" x-text="'最后更新: ' + lastUpdate"></span>
+          <button @click="runDetect()" class="btn btn--primary" :disabled="detecting"
+                  style="font-size:11px; padding:6px 14px;">
+            <i class="fa-solid fa-rotate" :class="{'fa-spin': detecting}"></i>
+            <span x-text="detecting ? '检测中...' : '运行检测'"></span>
+          </button>
+          <button @click="runVerify()" class="btn" :disabled="verifying"
+                  style="font-size:11px; padding:6px 14px; border:1px solid var(--border);">
+            <i class="fa-solid fa-check-double"></i>
+            <span x-text="verifying ? '验证中...' : '验证信号'"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Pipeline Flow Diagram -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card__body" style="padding:16px 20px;">
+          <div style="display:flex; align-items:center; gap:8px; overflow-x:auto; font-size:12px;">
+            <div class="pipeline-node" :class="sourceCount('inventory') ? 'active' : ''">
+              <i class="fa-solid fa-warehouse"></i> 库存
+              <span class="pipeline-badge" x-show="sourceCount('inventory')" x-text="sourceCount('inventory')"></span>
+            </div>
+            <div class="pipeline-node" :class="sourceCount('capital') ? 'active' : ''">
+              <i class="fa-solid fa-money-bill-trend-up"></i> 资金
+              <span class="pipeline-badge" x-show="sourceCount('capital')" x-text="sourceCount('capital')"></span>
+            </div>
+            <div class="pipeline-node" :class="sourceCount('commodity') ? 'active' : ''">
+              <i class="fa-solid fa-oil-well"></i> 商品
+              <span class="pipeline-badge" x-show="sourceCount('commodity')" x-text="sourceCount('commodity')"></span>
+            </div>
+            <div class="pipeline-node" :class="sourceCount('announcement') ? 'active' : ''">
+              <i class="fa-solid fa-file-lines"></i> 公告
+              <span class="pipeline-badge" x-show="sourceCount('announcement')" x-text="sourceCount('announcement')"></span>
+            </div>
+            <div class="pipeline-node" :class="sourceCount('overseas') ? 'active' : ''">
+              <i class="fa-solid fa-globe"></i> 海外
+              <span class="pipeline-badge" x-show="sourceCount('overseas')" x-text="sourceCount('overseas')"></span>
+            </div>
+
+            <div class="pipeline-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+
+            <div class="pipeline-node pipeline-node--engine">
+              <i class="fa-solid fa-link"></i> 关联分析
+            </div>
+
+            <div class="pipeline-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+
+            <div class="pipeline-node pipeline-node--engine">
+              <i class="fa-solid fa-brain"></i> AI研判
+            </div>
+
+            <div class="pipeline-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+
+            <div class="pipeline-node pipeline-node--output">
+              <span x-text="stats.active || 0"></span> 活跃信号
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; margin-bottom:16px;">
+        <div class="stat-card">
+          <div class="stat-card__value text-accent" x-text="stats.active || 0"></div>
+          <div class="stat-card__label">活跃</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__value" style="color:var(--warning);" x-text="stats.confirmed || 0"></div>
+          <div class="stat-card__label">已确认</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__value text-up" x-text="stats.verified || 0"></div>
+          <div class="stat-card__label">已验证</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__value text-muted" x-text="stats.expired || 0"></div>
+          <div class="stat-card__label">已过期</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__value" :class="stats.accuracy > 60 ? 'text-up' : 'text-down'"
+               x-text="stats.accuracy ? stats.accuracy + '%' : '—'"></div>
+          <div class="stat-card__label">准确率</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI Report Summary -->
+  <section style="padding: 0 0 12px;" x-show="report">
+    <div class="container">
+      <div class="card" style="border-left:3px solid var(--accent);">
+        <div class="card__body" style="padding:14px 18px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="font-size:18px;"><i class="fa-solid fa-brain" style="color:var(--accent);"></i></div>
+            <div style="flex:1;">
+              <div style="font-weight:600; font-size:14px;" x-text="report?.summary || ''"></div>
+              <div style="display:flex; gap:16px; margin-top:4px; font-size:11px; color:var(--text-muted);">
+                <span>分析 <span x-text="report?.signals_reviewed || 0"></span> 个信号</span>
+                <span>偏多 <span class="text-up" x-text="report?.bullish_sectors || 0"></span> 板块</span>
+                <span>偏空 <span class="text-down" x-text="report?.bearish_sectors || 0"></span> 板块</span>
+              </div>
+            </div>
+            <div class="badge" :class="report?.action === 'watch_bearish' ? 'badge--down' : report?.action === 'watch_bullish' ? 'badge--up' : 'badge--muted'"
+                 x-text="report?.action === 'watch_bearish' ? '防守为主' : report?.action === 'watch_bullish' ? '关注多头' : '观望'">
+            </div>
+          </div>
+          <!-- Top Call -->
+          <template x-if="report?.top_calls?.length > 0">
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px;">重点关注</div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <template x-for="call in report.top_calls.slice(0, 4)" :key="call.sector">
+                  <span class="badge" :class="call.direction === 'bearish' ? 'badge--down' : 'badge--up'"
+                        x-text="call.sector + ' ' + (call.direction === 'bearish' ? '↓' : '↑') + ' ' + Math.round(call.confidence * 100) + '%'">
+                  </span>
+                </template>
+              </div>
+            </div>
+          </template>
+          <!-- Risk Alerts -->
+          <template x-if="report?.risk_alerts?.length > 0">
+            <div style="margin-top:8px;">
+              <div style="font-size:11px; color:var(--warning);">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span x-text="report.risk_alerts.length + ' 条风险提示'"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Active Signals -->
+  <section style="padding: 0 0 24px;">
+    <div class="container">
+      <!-- Filter Tabs -->
+      <div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">
+        <button @click="filter = 'all'" class="tab-btn" :class="filter === 'all' ? 'active' : ''">
+          全部 <span class="text-muted" x-text="'(' + signals.length + ')'"></span>
+        </button>
+        <button @click="filter = 'S1'" class="tab-btn" :class="filter === 'S1' ? 'active' : ''">
+          <span style="color:var(--down);">●</span> S1临界
+        </button>
+        <button @click="filter = 'S2'" class="tab-btn" :class="filter === 'S2' ? 'active' : ''">
+          <span style="color:var(--warning);">●</span> S2高
+        </button>
+        <button @click="filter = 'S3'" class="tab-btn" :class="filter === 'S3' ? 'active' : ''">
+          <span style="color:var(--text-muted);">●</span> S3中
+        </button>
+        <button @click="filter = 'S4'" class="tab-btn" :class="filter === 'S4' ? 'active' : ''">
+          <span style="color:var(--border);">●</span> S4观察
+        </button>
+      </div>
+
+      <!-- Signal Cards -->
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <template x-for="sig in filteredSignals" :key="sig.id">
+          <div class="signal-card" :class="'signal-card--' + sig.severity.toLowerCase()">
+
+            <!-- Severity Bar + Content -->
+            <div style="display:flex; gap:14px; align-items:flex-start;">
+
+              <!-- Left: Severity + Confidence -->
+              <div style="min-width:70px; text-align:center;">
+                <div class="signal-severity" :class="'severity-' + sig.severity"
+                     x-text="sig.severity"></div>
+                <div style="margin-top:6px;">
+                  <div class="signal-conf-ring" :style="'--pct:' + (sig.confidence * 100)">
+                    <span x-text="Math.round(sig.confidence * 100) + '%'"></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Center: Description + Metadata -->
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:600; font-size:14px; margin-bottom:4px; line-height:1.4;"
+                     x-text="sig.description"></div>
+
+                <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:6px;">
+                  <!-- Source -->
+                  <span class="signal-meta">
+                    <i class="fa-solid fa-circle-dot"></i>
+                    <span x-text="sourceName(sig.source)"></span>
+                  </span>
+                  <!-- Type -->
+                  <span class="signal-meta">
+                    <i class="fa-solid fa-tag"></i>
+                    <span x-text="sig.type"></span>
+                  </span>
+                  <!-- Lead Time -->
+                  <span class="signal-meta">
+                    <i class="fa-solid fa-clock"></i>
+                    领先~<span x-text="sig.lead_time_days"></span>天
+                  </span>
+                  <!-- Direction -->
+                  <span class="signal-meta" :class="sig.direction === 'bullish' ? 'text-up' : sig.direction === 'bearish' ? 'text-down' : ''">
+                    <i :class="sig.direction === 'bullish' ? 'fa-solid fa-arrow-trend-up' : 'fa-solid fa-arrow-trend-down'"></i>
+                    <span x-text="sig.direction === 'bullish' ? '看多' : sig.direction === 'bearish' ? '看空' : '中性'"></span>
+                  </span>
+                  <!-- Timestamp -->
+                  <span class="signal-meta text-muted">
+                    <i class="fa-solid fa-calendar"></i>
+                    <span x-text="sig.timestamp ? sig.timestamp.substring(5, 16) : ''"></span>
+                  </span>
+                </div>
+
+                <!-- Target Sectors/Stocks -->
+                <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:8px;">
+                  <template x-for="sector in JSON.parse(sig.target_sectors || '[]')" :key="sector">
+                    <span class="badge badge--accent" x-text="sector"></span>
+                  </template>
+                  <template x-for="code in JSON.parse(sig.target_stocks || '[]')" :key="code">
+                    <a :href="'/stock/' + code" class="badge badge--muted" x-text="code" style="text-decoration:none;"></a>
+                  </template>
+                </div>
+
+                <!-- Corroboration -->
+                <div x-show="sig.corroboration && JSON.parse(sig.corroboration || '[]').length > 0"
+                     style="margin-top:6px; font-size:11px; color:var(--accent);">
+                  <i class="fa-solid fa-link"></i>
+                  <span x-text="(JSON.parse(sig.corroboration || '[]').length) + ' 个关联信号'"></span>
+                </div>
+              </div>
+
+              <!-- Right: Strength Bar -->
+              <div style="min-width:50px; text-align:center;">
+                <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">强度</div>
+                <div class="strength-bar">
+                  <div class="strength-bar__fill" :style="'height:' + sig.strength + '%'"
+                       :class="sig.strength > 75 ? 'strength--high' : sig.strength > 50 ? 'strength--mid' : 'strength--low'">
+                  </div>
+                </div>
+                <div style="font-size:13px; font-weight:600; margin-top:4px;"
+                     x-text="Math.round(sig.strength)"></div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Empty State -->
+        <div x-show="filteredSignals.length === 0" class="empty-state" style="padding:40px;">
+          <div class="empty-state__icon"><i class="fa-solid fa-satellite-dish"></i></div>
+          <div class="empty-state__text" x-text="filter === 'all' ? '暂无活跃信号' : '该级别暂无信号'"></div>
+          <div class="text-sm text-muted" style="margin-top:8px;">
+            点击「运行检测」采集最新数据并检测信号
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function radar() {
+  return {
+    signals: [],
+    stats: {},
+    report: null,
+    filter: 'all',
+    detecting: false,
+    verifying: false,
+    lastUpdate: '',
+
+    async load() {
+      try {
+        const [sigRes, reportRes] = await Promise.all([
+          fetch('/api/signals/v2'),
+          fetch('/api/report')
+        ]);
+        const sigData = await sigRes.json();
+        this.signals = sigData.signals || [];
+        this.stats = sigData.stats || {};
+        this.report = await reportRes.json();
+        this.lastUpdate = new Date().toLocaleString('zh-CN');
+      } catch (e) {
+        console.error('Load error:', e);
+      }
+    },
+
+    get filteredSignals() {
+      if (this.filter === 'all') return this.signals;
+      return this.signals.filter(s => s.severity === this.filter);
+    },
+
+    sourceCount(src) {
+      return this.signals.filter(s => s.source === src).length;
+    },
+
+    sourceName(src) {
+      const names = {
+        inventory: '库存', capital: '资金', commodity: '商品',
+        announcement: '公告', overseas: '海外', news: '新闻',
+        correlator: '关联分析'
+      };
+      return names[src] || src;
+    },
+
+    async runDetect() {
+      this.detecting = true;
+      try {
+        const res = await fetch('/api/signals/v2/run-detect', { method: 'POST' });
+        const data = await res.json();
+        await this.load();
+      } catch (e) {
+        console.error('Detect error:', e);
+      }
+      this.detecting = false;
+    },
+
+    async runVerify() {
+      this.verifying = true;
+      try {
+        const res = await fetch('/api/verify', { method: 'POST' });
+        const data = await res.json();
+        // 更新统计
+        await this.load();
+        const msg = `验证完成: ${data.verified}正确, ${data.invalidated}错误, ${data.expired}过期`;
+        alert(msg);
+      } catch (e) {
+        console.error('Verify error:', e);
+      }
+      this.verifying = false;
+    }
+  };
+}
+</script>
+{% endblock %}
