@@ -161,8 +161,9 @@ NOTIFY = {
 }
 
 # === 存储 ===
-DB_PATH = "/opt/ai-monitor/data/monitor.db"
-LOG_PATH = "/opt/ai-monitor/logs/monitor.log"
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(_BASE_DIR, "data", "monitor.db")
+LOG_PATH = os.path.join(_BASE_DIR, "logs", "monitor.log")
 
 # === 定时任务 ===
 SCHEDULE = {

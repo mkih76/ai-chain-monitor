@@ -6,7 +6,7 @@ import sqlite3
 import os
 from datetime import datetime
 
-DB_PATH = "/opt/ai-monitor/data/monitor.db"
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "monitor.db")
 
 def get_conn():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -165,6 +165,31 @@ def init_db():
             source TEXT,
             ai_impact TEXT,
             UNIQUE(timestamp, material)
+        )
+    """)
+
+    # 先行信号 v2（核心信号表）
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS signals_v2 (
+            id TEXT PRIMARY KEY,
+            timestamp TEXT NOT NULL,
+            source TEXT NOT NULL,
+            type TEXT NOT NULL,
+            target_stocks TEXT,
+            target_sectors TEXT,
+            direction TEXT,
+            severity TEXT NOT NULL,
+            lead_time_days INTEGER,
+            confidence REAL,
+            strength REAL,
+            raw_data TEXT,
+            description TEXT,
+            corroboration TEXT,
+            status TEXT DEFAULT 'active',
+            ai_verdict TEXT,
+            price_at_creation REAL,
+            price_verified_at TEXT,
+            price_change_pct REAL
         )
     """)
 
@@ -381,6 +406,162 @@ def get_material_history(material, days=30):
     conn.close()
     return [dict(r) for r in rows]
 
-if __name__ == "__main__":
-    init_db()
-    print("Database initialized at", DB_PATH)
+
+# ============================================================
+# 信号 v2 CRUD
+# ============================================================
+import json as _json
+
+def insert_signal_v2(signal):
+    """保存Signal对象到signals_v2表"""
+    conn = get_conn()
+    d = signal.to_dict() if hasattr(signal, 'to_dict') else signal
+    conn.execute(
+        """INSERT OR REPLACE INTO signals_v2
+           (id, timestamp, source, type, target_stocks, target_sectors,
+            direction, severity, lead_time_days, confidence, strength,
+            raw_data, description, corroboration, status, ai_verdict,
+            price_at_creation, price_verified_at, price_change_pct)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (d["id"], d["timestamp"], d["source"], d["type"],
+         _json.dumps(d["target_stocks"], ensure_ascii=False),
+         _json.dumps(d["target_sectors"], ensure_ascii=False),
+         d["direction"], d["severity"], d["lead_time_days"],
+         d["confidence"], d["strength"],
+         _json.dumps(d["raw_data"], ensure_ascii=False),
+         d["description"],
+         _json.dumps(d["corroboration"], ensure_ascii=False),
+         d["status"],
+         _json.dumps(d["ai_verdict"], ensure_ascii=False) if d.get("ai_verdict") else None,
+         d.get("price_at_creation"),
+         d.get("price_verified_at"),
+         d.get("price_change_pct"))
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_active_signals(limit=50):
+    """获取活跃信号，按severity+confidence排序"""
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT * FROM signals_v2
+           WHERE status IN ('active', 'confirmed')
+           ORDER BY
+             CASE severity WHEN 'S1' THEN 1 WHEN 'S2' THEN 2
+                           WHEN 'S3' THEN 3 ELSE 4 END,
+             confidence DESC
+           LIMIT ?""",
+        (limit,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_signals_by_sector(sector, limit=20):
+    """按板块查询信号"""
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT * FROM signals_v2
+           WHERE target_sectors LIKE ? AND status IN ('active', 'confirmed')
+           ORDER BY confidence DESC LIMIT ?""",
+        (f'%{sector}%', limit)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_signal_by_id(signal_id):
+    """按ID查询信号"""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM signals_v2 WHERE id=?", (signal_id,)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_signal_status(signal_id, status):
+    """更新信号状态"""
+    conn = get_conn()
+    conn.execute(
+        "UPDATE signals_v2 SET status=? WHERE id=?",
+        (status, signal_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+def update_signal_corroboration(signal_id, corroborated_by):
+    """添加佐证信号"""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT corroboration FROM signals_v2 WHERE id=?", (signal_id,)
+    ).fetchone()
+    if row:
+        existing = _json.loads(row["corroboration"]) if row["corroboration"] else []
+        if corroborated_by not in existing:
+            existing.append(corroborated_by)
+        conn.execute(
+            "UPDATE signals_v2 SET corroboration=?, status='confirmed' WHERE id=?",
+            (_json.dumps(existing), signal_id)
+        )
+    conn.commit()
+    conn.close()
+
+
+def expire_old_signals():
+    """过期老信号：无佐证72h，有佐证120h"""
+    conn = get_conn()
+    conn.execute("""
+        UPDATE signals_v2 SET status='expired'
+        WHERE status IN ('active', 'confirmed')
+        AND (
+            (corroboration = '[]' OR corroboration IS NULL
+             AND julianday('now') - julianday(timestamp) > 3)
+            OR
+            (corroboration != '[]' AND corroboration IS NOT NULL
+             AND julianday('now') - julianday(timestamp) > 5)
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def get_signal_stats():
+    """信号统计"""
+    conn = get_conn()
+    stats = {}
+    for status in ["active", "confirmed", "expired", "verified", "invalidated"]:
+        row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM signals_v2 WHERE status=?",
+            (status,)
+        ).fetchone()
+        stats[status] = row["cnt"]
+
+    # 准确率 = verified / (verified + invalidated)
+    v = stats.get("verified", 0)
+    inv = stats.get("invalidated", 0)
+    total = v + inv
+    stats["accuracy"] = round(v / total * 100, 1) if total > 0 else None
+
+    conn.close()
+    return stats
+
+
+def get_all_signals(limit=100, status=None, source=None):
+    """查询信号（带过滤）"""
+    conn = get_conn()
+    sql = "SELECT * FROM signals_v2 WHERE 1=1"
+    params = []
+    if status:
+        sql += " AND status=?"
+        params.append(status)
+    if source:
+        sql += " AND source=?"
+        params.append(source)
+    sql += " ORDER BY timestamp DESC LIMIT ?"
+    params.append(limit)
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]

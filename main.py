@@ -22,7 +22,7 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-sys.path.insert(0, "/opt/ai-monitor")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db import init_db, get_unsent_signals, mark_signal_sent
 from collectors.stock_collector import collect_all as collect_stocks
 from collectors.inventory_collector import collect_inventory
@@ -44,7 +44,7 @@ def log(msg):
         print(line)
     except UnicodeEncodeError:
         print(line.encode("utf-8", errors="replace").decode("utf-8", errors="replace"))
-    os.makedirs(config.LOG_PATH.rsplit("/", 1)[0], exist_ok=True)
+    os.makedirs(os.path.dirname(config.LOG_PATH), exist_ok=True)
     with open(config.LOG_PATH, "a", encoding="utf-8") as f:
         f.write(line + "\n")
 

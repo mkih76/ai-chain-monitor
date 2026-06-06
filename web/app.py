@@ -245,7 +245,7 @@ def api_news_summary():
 
 @app.route("/api/signals")
 def api_signals():
-    """信号列表"""
+    """信号列表（旧版）"""
     from db import init_db, get_conn
     init_db()
     limit = int(__import__("flask").request.args.get("limit", 50))
@@ -253,6 +253,58 @@ def api_signals():
     rows = conn.execute("SELECT * FROM signals ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
+
+
+# ============================================================
+# 先行信号 v2 API
+# ============================================================
+@app.route("/api/signals/v2")
+def api_signals_v2():
+    """活跃先行信号列表"""
+    from db import init_db, get_active_signals, get_signal_stats
+    init_db()
+    signals = get_active_signals(limit=50)
+    stats = get_signal_stats()
+    return jsonify({"signals": signals, "stats": stats})
+
+
+@app.route("/api/signals/v2/all")
+def api_signals_v2_all():
+    """所有信号（带过滤）"""
+    from db import init_db, get_all_signals
+    init_db()
+    req = __import__("flask").request
+    status = req.args.get("status")
+    source = req.args.get("source")
+    limit = int(req.args.get("limit", 100))
+    signals = get_all_signals(limit=limit, status=status, source=source)
+    return jsonify(signals)
+
+
+@app.route("/api/signals/v2/sector/<sector>")
+def api_signals_v2_sector(sector):
+    """按板块查询信号"""
+    from db import init_db, get_signals_by_sector
+    init_db()
+    signals = get_signals_by_sector(sector)
+    return jsonify(signals)
+
+
+@app.route("/api/signals/v2/run-detect", methods=["POST"])
+def api_run_detect():
+    """手动触发信号检测"""
+    from detect_runner import run_all_detectors
+    signals = run_all_detectors()
+    return jsonify({
+        "detected": len(signals),
+        "message": f"检测完成，产生 {len(signals)} 个信号"
+    })
+
+
+@app.route("/radar")
+def radar_page():
+    """信号雷达页面"""
+    return render_template("radar.html")
 
 @app.route("/api/ai-analysis")
 def api_ai_analysis():

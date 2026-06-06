@@ -800,3 +800,127 @@ a:hover { text-decoration: underline; }
   .metrics-row { grid-template-columns: 1fr; }
   .stock-stats { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ========== Signal Radar ========== */
+
+/* Pipeline flow */
+.pipeline-node {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 20px;
+  background: var(--bg-tertiary); border: 1px solid var(--border);
+  font-size: 12px; font-weight: 500; white-space: nowrap;
+  transition: all 0.2s;
+}
+.pipeline-node.active {
+  background: rgba(59,130,246,0.1); border-color: var(--accent);
+  color: var(--accent);
+}
+.pipeline-node--engine {
+  background: rgba(139,92,246,0.1); border-color: #8b5cf6; color: #a78bfa;
+}
+.pipeline-node--output {
+  background: rgba(5,150,105,0.1); border-color: var(--up); color: var(--up);
+  font-weight: 700;
+}
+.pipeline-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: 9px; background: var(--accent); color: #fff;
+  font-size: 10px; font-weight: 700;
+}
+.pipeline-arrow {
+  color: var(--text-muted); font-size: 11px; flex-shrink: 0;
+}
+
+/* Stats */
+.stat-card {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px; text-align: center;
+}
+.stat-card__value {
+  font-size: 22px; font-weight: 700; font-family: var(--font-mono);
+}
+.stat-card__label {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+}
+
+/* Filter tabs */
+.tab-btn {
+  padding: 6px 14px; border-radius: 16px; border: 1px solid var(--border);
+  background: var(--bg-secondary); color: var(--text-secondary);
+  font-size: 12px; cursor: pointer; transition: all 0.15s;
+}
+.tab-btn.active {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+.tab-btn:hover:not(.active) {
+  border-color: var(--accent); color: var(--accent);
+}
+
+/* Signal cards */
+.signal-card {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px;
+  border-left: 4px solid var(--border);
+  transition: all 0.2s;
+}
+.signal-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+}
+.signal-card--s1 { border-left-color: var(--down); }
+.signal-card--s2 { border-left-color: var(--warning); }
+.signal-card--s3 { border-left-color: var(--text-muted); }
+.signal-card--s4 { border-left-color: var(--border); }
+
+/* Severity badge */
+.signal-severity {
+  display: inline-block; padding: 3px 10px; border-radius: 12px;
+  font-size: 12px; font-weight: 700; font-family: var(--font-mono);
+}
+.severity-S1 { background: rgba(220,38,38,0.15); color: var(--down); }
+.severity-S2 { background: rgba(234,179,8,0.15); color: var(--warning); }
+.severity-S3 { background: rgba(148,163,184,0.15); color: var(--text-muted); }
+.severity-S4 { background: rgba(100,116,139,0.1); color: var(--text-muted); }
+
+/* Confidence ring */
+.signal-conf-ring {
+  width: 48px; height: 48px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; font-family: var(--font-mono);
+  background: conic-gradient(var(--accent) calc(var(--pct) * 1%), var(--bg-tertiary) 0);
+  position: relative;
+}
+.signal-conf-ring::before {
+  content: ''; position: absolute;
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--bg-secondary);
+}
+.signal-conf-ring span { position: relative; z-index: 1; }
+
+/* Strength bar */
+.strength-bar {
+  width: 8px; height: 50px; background: var(--bg-tertiary);
+  border-radius: 4px; overflow: hidden; margin: 0 auto;
+  display: flex; align-items: flex-end;
+}
+.strength-bar__fill {
+  width: 100%; border-radius: 4px; transition: height 0.5s ease;
+}
+.strength--high { background: var(--down); }
+.strength--mid { background: var(--warning); }
+.strength--low { background: var(--text-muted); }
+
+/* Signal metadata */
+.signal-meta {
+  font-size: 11px; color: var(--text-muted);
+  display: flex; align-items: center; gap: 4px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .pipeline-node { padding: 6px 10px; font-size: 11px; }
+  .signal-card { padding: 12px; }
+  .signal-conf-ring { width: 40px; height: 40px; font-size: 10px; }
+  .signal-conf-ring::before { width: 32px; height: 32px; }
+}
