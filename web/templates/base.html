@@ -5,15 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}AI产业链监控{% endblock %}</title>
 
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-  <!-- Font Awesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-
-  <!-- Main CSS -->
-  <link rel="stylesheet" href="/static/css/main.css">
+  <!-- Static CSS (cache-bust) -->
+  <script>document.write('<link rel="stylesheet" href="/static/css/main.css?v=' + Date.now() + '">');</script>
+  <noscript><link rel="stylesheet" href="/static/css/main.css"></noscript>
 
   <!-- ECharts -->
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
@@ -32,25 +26,25 @@
   <!-- Navigation -->
   <nav class="nav">
     <div class="nav__inner">
-      <a href="/" class="nav__brand">
-        <div class="nav__brand-icon">AI</div>
-        <span>AI产业链监控</span>
+      <a href="/" class="nav__logo">
+        <span class="nav__logo-icon">🤖</span>
+        <span>AI</span>
+        <span class="nav__logo-sub">产业链监控</span>
       </a>
       <div class="nav__links">
-        <a href="/signal" class="nav__link {% if request.path == '/signal' %}active{% endif %}">
-          <i class="fa-solid fa-satellite-dish" style="font-size:11px; margin-right:4px;"></i>信号
+        <a href="/signals" class="nav__link {% if request.endpoint == 'signals_page' %}nav__link--active{% endif %}">
+          <span>📊</span> 信号
         </a>
-        <a href="/market" class="nav__link {% if request.path == '/market' %}active{% endif %}">
-          <i class="fa-solid fa-chart-column" style="font-size:11px; margin-right:4px;"></i>市场
+        <a href="/market" class="nav__link {% if request.endpoint == 'market_page' %}nav__link--active{% endif %}">
+          <span>📈</span> 市场
         </a>
-        <a href="/report" class="nav__link {% if request.path == '/report' %}active{% endif %}">
-          <i class="fa-solid fa-file-lines" style="font-size:11px; margin-right:4px;"></i>报告
+        <a href="/report" class="nav__link {% if request.endpoint == 'report_page' %}nav__link--active{% endif %}">
+          <span>📋</span> 报告
         </a>
-        <a href="/review" class="nav__link {% if request.path == '/review' %}active{% endif %}">
-          <i class="fa-solid fa-rotate-left" style="font-size:11px; margin-right:4px;"></i>复盘
+        <a href="/review" class="nav__link {% if request.endpoint == 'review_page' %}nav__link--active{% endif %}">
+          <span>🔍</span> 复盘
         </a>
       </div>
-      <div class="nav__clock" id="nav-clock"></div>
     </div>
   </nav>
 
@@ -64,29 +58,14 @@
   <!-- Footer -->
   <footer class="footer">
     <div class="container">
-      <div class="footer__inner">
-        <span>AI产业链监控 v3 · 数据仅供参考，不构成投资建议</span>
-        <div class="footer__links">
-          <a href="/api/health" class="footer__link">API</a>
-          <a href="/api/dashboard" class="footer__link">数据</a>
-          <span class="footer__link">采集自公开市场</span>
-        </div>
-      </div>
+      <span>AI产业链监控 v3 · 数据仅供参考，不构成投资建议</span>
+      <span class="footer__right">
+        <a href="/api/dashboard">API</a> ·
+        <a href="/data">数据</a>
+        · 采集自公开市场
+      </span>
     </div>
   </footer>
-
-  <!-- Clock -->
-  <script>
-    function updateClock() {
-      const el = document.getElementById('nav-clock');
-      if (el) {
-        const now = new Date();
-        el.textContent = now.toLocaleString('zh-CN', { hour12: false });
-      }
-    }
-    updateClock();
-    setInterval(updateClock, 1000);
-  </script>
 
   {% block scripts %}{% endblock %}
 </body>

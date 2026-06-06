@@ -195,6 +195,7 @@ function market() {
     stockList: [],
     sourceStatus: [],
     causalChains: [],
+    upCount: 0, downCount: 0, flatCount: 0,
 
     srcLabel(s) {
       return {inventory:'库存',capital:'资金',commodity:'商品',overseas:'海外',announcement:'公告',correlator:'共振'}[s]||s;
@@ -202,46 +203,64 @@ function market() {
 
     async load() {
       try {
-        const [dashRes, sigRes, invRes, matRes, stockRes, causalRes] = await Promise.all([
-          fetch('/api/dashboard'),
+        // 分批加载，避免任一API超时阻塞整体
+        // 第一批：核心+不依赖外部API的
+        const [sigRes, stockRes] = await Promise.all([
           fetch('/api/signals/v2'),
-          fetch('/api/inventory/history'),
-          fetch('/api/materials/history'),
           fetch('/api/stocks'),
-          fetch('/api/causal-chains'),
         ]);
-        const d = await dashRes.json();
         const sigData = await sigRes.json();
         const signals = sigData.signals || [];
         const stocks = stockRes.ok ? await stockRes.json() : [];
-        const chains = await causalRes.json();
-
-        this.overseas = d.overseas || [];
-        this.sectors = d.sectors || {};
-        this.northbound = d.northbound || {};
-        this.capital_signals = signals.filter(s => s.source === 'capital');
-        this.inventoryData = await invRes.json();
-        this.materialData = await matRes.json();
         this.stockList = Array.isArray(stocks) ? stocks : [];
 
-        // 涨跌统计
-        this.upCount = this.stockList.filter(s=>(s.change_pct||0)>0).length;
-        this.downCount = this.stockList.filter(s=>(s.change_pct||0)<0).length;
-        this.flatCount = this.stockList.filter(s=>(s.change_pct||0)===0).length;
-
-        // 指标状态
-        this.buildSourceStatus(signals, d);
-        // 因果链（服务端LLM推理）
-        this.causalChains = Array.isArray(chains) ? chains : [];
-        // 标注机构席位股票
-        this.markInstitutionalStocks();
-
-        this.$nextTick(() => {
-          this.renderInventoryChart();
-          this.renderPriceChart();
-        });
+        // 第二批：后台加载
+        this._bgLoad(signals);
       } catch (e) {
         console.error('Market load error:', e);
+      }
+    },
+
+    async _bgLoad(signals) {
+      // dashboard/overseas依赖push2(可能被墙)，非阻塞
+      Promise.all([
+        fetch('/api/dashboard').then(r=>r.json()).then(d => {
+          this.overseas = d.overseas || [];
+          this.sectors = d.sectors || {};
+          this.northbound = d.northbound || {};
+          this.capital_signals = signals.filter(s => s.source === 'capital');
+          this.buildSourceStatus(signals, d);
+          this.upCount = this.stockList.filter(s=>(s.change_pct||0)>0).length;
+          this.downCount = this.stockList.filter(s=>(s.change_pct||0)<0).length;
+          this.flatCount = this.stockList.filter(s=>(s.change_pct||0)===0).length;
+          this.markInstitutionalStocks();
+        }).catch(()=>{}),
+        fetch('/api/inventory/history').then(r=>r.json()).then(d => {
+          this.inventoryData = d;
+          this.renderInventoryChart();
+        }).catch(()=>{}),
+        fetch('/api/materials/history').then(r=>r.json()).then(d => {
+          this.materialData = d;
+          this.renderPriceChart();
+        }).catch(()=>{}),
+      ]);
+
+      // 因果链独立，不阻塞
+      this._loadCausalChains(signals);
+    },
+
+    async _loadCausalChains(signals) {
+      try {
+        const ctrl = new AbortController();
+        const to = setTimeout(() => ctrl.abort(), 10000);
+        const r = await fetch('/api/causal-chains', {signal: ctrl.signal});
+        clearTimeout(to);
+        if (r.ok) {
+          const chains = await r.json();
+          this.causalChains = Array.isArray(chains) ? chains : [];
+        }
+      } catch(e) {
+        // 因果链加载失败不影响主流程
       }
     },
 
