@@ -39,8 +39,23 @@ def run_correlation(signals: list) -> list:
 
     init_db()
 
+    # 清理上一轮的活跃信号（每次检测重新生成）
+    conn = get_conn()
+    conn.execute("DELETE FROM signals_v2 WHERE status IN ('active', 'confirmed')")
+    conn.commit()
+    conn.close()
+
     # 过期老信号
     expire_old_signals()
+
+    # 去重：按信号ID
+    seen_ids = set()
+    unique_input = []
+    for sig in signals:
+        if sig.id not in seen_ids:
+            seen_ids.add(sig.id)
+            unique_input.append(sig)
+    signals = unique_input
 
     # Step 1: 按板块分组
     sector_groups = defaultdict(list)
@@ -52,12 +67,16 @@ def run_correlation(signals: list) -> list:
             sector_groups["_unclassified"].append(sig)
 
     enhanced_signals = []
+    saved_raw_ids = set()  # 跟踪已保存的原始信号
+    created_corr_keys = set()  # 跟踪已创建的关联信号(源信号ID集合)
 
     for sector, group_signals in sector_groups.items():
         if sector == "_unclassified":
             # 未分类信号直接保存
             for sig in group_signals:
-                insert_signal_v2(sig)
+                if sig.id not in saved_raw_ids:
+                    insert_signal_v2(sig)
+                    saved_raw_ids.add(sig.id)
                 enhanced_signals.append(sig)
             continue
 
@@ -70,8 +89,11 @@ def run_correlation(signals: list) -> list:
 
         unique_signals = list(by_source.values())
 
+        # 关联信号去重key：源信号ID排序后的集合
+        corr_key = tuple(sorted(s.id for s in unique_signals))
+
         # Step 3: 多源印证
-        if len(unique_signals) >= 2:
+        if len(unique_signals) >= 2 and corr_key not in created_corr_keys:
             # 计算综合置信度（假设独立信号）
             combined_conf = 1.0
             for sig in unique_signals:
@@ -140,11 +162,14 @@ def run_correlation(signals: list) -> list:
                 sig.corroboration.append(enhanced.id)
                 enhanced.corroboration.append(sig.id)
 
-            # 保存所有信号
+            # 保存所有信号（去重）
             for sig in unique_signals:
-                insert_signal_v2(sig)
+                if sig.id not in saved_raw_ids:
+                    insert_signal_v2(sig)
+                    saved_raw_ids.add(sig.id)
             insert_signal_v2(enhanced)
             enhanced_signals.append(enhanced)
+            created_corr_keys.add(corr_key)
 
         else:
             # 单源信号，直接保存

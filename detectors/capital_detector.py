@@ -1,253 +1,240 @@
 """
 M2 · 资金异动信号检测器
-检测北向资金/龙虎榜/融资融券/大宗交易/机构调研的异常行为
+检测龙虎榜/融资融券/大宗交易/北向资金的异常行为
 
-核心逻辑：
-- 机构和外资有信息优势，其买卖行为领先于公开信息
-- 连续买入/集中买入 = 消息面出来前的建仓
-- 融资余额激增 = 杠杆资金先行入场
+数据源:
+- 龙虎榜: datacenter-web.eastmoney.com ✅ 可用
+- 融资融券: datacenter-web.eastmoney.com ✅ 可用
+- 大宗交易: datacenter-web.eastmoney.com ✅ 可用
+- 北向个股: push2.eastmoney.com ⚠️ 部分IP被拦截
 """
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from models import Signal, Severity, Direction, SignalSource
-from db import get_conn, init_db
+from db import get_conn, init_db, insert_northbound_history
+from datetime import datetime
 import config
+import requests
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Referer": "https://data.eastmoney.com/",
+}
+
+# 监控标的集合（快速查找）
+_WATCHLIST_CODES = set(config.WATCHLIST.keys())
 
 
 def detect_capital_signals():
-    """
-    检测资金异动信号，返回Signal列表
-    """
+    """检测资金异动信号"""
     init_db()
     signals = []
 
-    # 1. 北向资金连续买入
-    signals.extend(_detect_northbound_consecutive())
+    # 1. 龙虎榜机构席位
+    signals.extend(_detect_dragon_tiger())
 
-    # 2. 北向资金单日大额净买入
-    signals.extend(_detect_northbound_surge())
-
-    # 3. 龙虎榜机构席位
-    signals.extend(_detect_institutional_dragon())
-
-    # 4. 融资余额激增
+    # 2. 融资余额激增
     signals.extend(_detect_margin_surge())
 
-    # 5. 机构调研密集
-    signals.extend(_detect_research_cluster())
+    # 3. 大宗交易机构溢价买入
+    signals.extend(_detect_block_trade_premium())
 
     return signals
 
 
-def _detect_northbound_consecutive():
-    """检测北向资金连续买入同一标的"""
-    signals = []
-    conn = get_conn()
-
-    # 获取最近10天的北向资金个股数据
-    rows = conn.execute("""
-        SELECT code, date, net_buy
-        FROM northbound_history
-        WHERE date >= date('now', '-15 days')
-        ORDER BY code, date DESC
-    """).fetchall()
-    conn.close()
-
-    if not rows:
-        return signals
-
-    # 按股票分组，检查连续买入
-    by_code = {}
-    for r in rows:
-        code = r["code"]
-        if code not in by_code:
-            by_code[code] = []
-        by_code[code].append(dict(r))
-
-    for code, trades in by_code.items():
-        # 按日期降序排列
-        trades.sort(key=lambda x: x["date"], reverse=True)
-
-        # 检查连续净买入天数
-        consecutive = 0
-        total_net = 0
-        for t in trades:
-            if t["net_buy"] and t["net_buy"] > 0:
-                consecutive += 1
-                total_net += t["net_buy"]
-            else:
-                break
-
-        if consecutive >= 3:
-            name, sector = config.WATCHLIST.get(code, (code, ""))
-            severity = Severity.S2_HIGH if consecutive >= 5 else Severity.S3_MEDIUM
-            signals.append(Signal(
-                source=SignalSource.CAPITAL,
-                type_="northbound_consecutive",
-                target_stocks=[code],
-                target_sectors=[sector] if sector else [],
-                direction=Direction.BULLISH,
-                severity=severity,
-                description=(f"北向资金连续{consecutive}天净买入{name}({code})，"
-                           f"累计{total_net / 1e8:.2f}亿"),
-                raw_data={
-                    "code": code,
-                    "consecutive_days": consecutive,
-                    "total_net_buy": total_net,
-                    "daily_trades": trades[:consecutive],
-                },
-                lead_time_days=5,
-                confidence=min(0.5 + consecutive * 0.08, 0.85),
-                strength=min(consecutive * 15, 85),
-            ))
-
-    return signals
-
-
-def _detect_northbound_surge():
-    """检测北向资金单日大额净买入"""
-    signals = []
-    conn = get_conn()
-
-    rows = conn.execute("""
-        SELECT code, date, net_buy
-        FROM northbound_history
-        WHERE date >= date('now', '-3 days')
-        AND net_buy > 100000000
-        ORDER BY net_buy DESC
-    """).fetchall()
-    conn.close()
-
-    for r in rows:
-        code, net_buy = r["code"], r["net_buy"]
-        name, sector = config.WATCHLIST.get(code, (code, ""))
-        signals.append(Signal(
-            source=SignalSource.CAPITAL,
-            type_="northbound_surge",
-            target_stocks=[code],
-            target_sectors=[sector] if sector else [],
-            direction=Direction.BULLISH,
-            severity=Severity.S2_HIGH,
-            description=f"北向资金单日净买入{name}({code}) {net_buy / 1e8:.2f}亿",
-            raw_data={"code": code, "date": r["date"], "net_buy": net_buy},
-            lead_time_days=3,
-            confidence=0.65,
-            strength=70,
-        ))
-
-    return signals
-
-
-def _detect_institutional_dragon():
-    """检测龙虎榜机构席位大额买入（需从东方财富API实时获取）"""
-    # 这个检测器依赖 institutional_collector 的实时数据
-    # 在 detect 阶段调用 collector 获取最新龙虎榜，再检测
+def _detect_dragon_tiger():
+    """
+    龙虎榜信号检测
+    条件: reason含"机构" + 净买入>5000万
+    额外加分: 在监控标的中
+    """
     signals = []
     try:
         from collectors.institutional_collector import fetch_dragon_tiger
         data = fetch_dragon_tiger(days=3)
+        if not data:
+            return signals
 
-        for item in data or []:
-            if not item.get("institutional_net_buy"):
+        # 按股票聚合（同一只可能多天上榜）
+        by_code = {}
+        for item in data:
+            code = item.get("code", "")
+            reason = item.get("reason", "")
+            net_buy = item.get("net_buy", 0)
+
+            # 只关注机构买入（reason含"机构"且不含"卖出"）
+            if not reason or "机构" not in reason:
                 continue
-            net = item["institutional_net_buy"]
-            if net > 50000000:  # 机构净买入>5000万
-                code = item.get("code", "")
-                name, sector = config.WATCHLIST.get(code, (code, ""))
-                signals.append(Signal(
-                    source=SignalSource.CAPITAL,
-                    type_="institutional_buy",
-                    target_stocks=[code],
-                    target_sectors=[sector] if sector else [],
-                    direction=Direction.BULLISH,
-                    severity=Severity.S2_HIGH,
-                    description=f"龙虎榜机构专用席位净买入{name}({code}) {net / 1e8:.2f}亿",
-                    raw_data=item,
-                    lead_time_days=3,
-                    confidence=0.7,
-                    strength=75,
-                ))
-    except Exception:
-        pass  # 采集器不可用时静默跳过
+            if "卖出" in reason:
+                continue
+            if net_buy <= 50000000:  # 5000万阈值
+                continue
+
+            if code not in by_code:
+                by_code[code] = []
+            by_code[code].append(item)
+
+        for code, items in by_code.items():
+            total_net = sum(i["net_buy"] for i in items)
+            total_net_yi = total_net / 1e8
+            name = items[0]["name"]
+            reason = items[0]["reason"]
+
+            # 判断是否在监控标的中
+            in_watchlist = code in _WATCHLIST_CODES
+            _, sector = config.WATCHLIST.get(code, (name, ""))
+
+            # 在监控标的中 → 更高severity
+            severity = Severity.S2_HIGH if in_watchlist else Severity.S3_MEDIUM
+            confidence = 0.7 if in_watchlist else 0.55
+
+            signals.append(Signal(
+                source=SignalSource.CAPITAL,
+                type_="institutional_buy",
+                target_stocks=[code],
+                target_sectors=[sector] if sector else [],
+                direction=Direction.BULLISH,
+                severity=severity,
+                description=(f"龙虎榜机构净买入{name}({code}) {total_net_yi:.2f}亿"
+                           f"{' ★监控标的' if in_watchlist else ''} [{reason[:20]}]"),
+                raw_data={
+                    "code": code, "name": name,
+                    "total_net_buy": total_net,
+                    "reason": reason,
+                    "in_watchlist": in_watchlist,
+                    "entries": len(items),
+                },
+                lead_time_days=3,
+                confidence=confidence,
+                strength=confidence * 100,
+            ))
+
+    except Exception as e:
+        print(f"  [ERROR] 龙虎榜检测: {e}")
 
     return signals
 
 
 def _detect_margin_surge():
-    """检测融资余额激增"""
+    """
+    融资余额激增检测
+    条件: 监控标的5日融资余额增幅>10%
+    """
     signals = []
     try:
         from collectors.institutional_collector import fetch_margin_trading
 
         for code, (name, sector) in config.WATCHLIST.items():
-            data = fetch_margin_trading(code, days=10)
+            try:
+                data = fetch_margin_trading(code, days=6)
+            except Exception:
+                continue
+
             if not data or len(data) < 5:
                 continue
 
-            # 计算最近5天融资余额变化率
-            recent = data[0].get("rzye", 0)  # 融资余额
-            older = data[4].get("rzye", 0)
-            if older and older > 0:
-                change_pct = (recent - older) / older * 100
-                if change_pct > 10:  # 周增幅>10%
-                    signals.append(Signal(
-                        source=SignalSource.CAPITAL,
-                        type_="margin_surge",
-                        target_stocks=[code],
-                        target_sectors=[sector],
-                        direction=Direction.BULLISH,
-                        severity=Severity.S3_MEDIUM,
-                        description=(f"{name}({code})融资余额5日增幅{change_pct:.1f}%，"
-                                   f"杠杆资金加速入场"),
-                        raw_data={"code": code, "change_pct": round(change_pct, 2),
-                                  "recent": recent, "older": older},
-                        lead_time_days=3,
-                        confidence=0.55,
-                        strength=55,
-                    ))
-    except Exception:
-        pass
+            recent = data[0].get("rz_balance", 0)
+            older = data[4].get("rz_balance", 0)
+
+            if not older or older <= 0:
+                continue
+
+            change_pct = (recent - older) / older * 100
+
+            if change_pct > 10:
+                signals.append(Signal(
+                    source=SignalSource.CAPITAL,
+                    type_="margin_surge",
+                    target_stocks=[code],
+                    target_sectors=[sector],
+                    direction=Direction.BULLISH,
+                    severity=Severity.S3_MEDIUM,
+                    description=(f"{name}({code})融资余额5日增{change_pct:.1f}%，"
+                               f"杠杆资金加速入场"),
+                    raw_data={
+                        "code": code,
+                        "change_pct": round(change_pct, 2),
+                        "recent_balance": recent,
+                        "older_balance": older,
+                    },
+                    lead_time_days=3,
+                    confidence=0.55,
+                    strength=55,
+                ))
+    except Exception as e:
+        print(f"  [ERROR] 融资检测: {e}")
 
     return signals
 
 
-def _detect_research_cluster():
-    """检测机构调研密集（7天内>5家机构调研同一标的）"""
+def _detect_block_trade_premium():
+    """
+    大宗交易溢价检测
+    条件: 机构专用买入 + 溢价>5% 或 金额>5000万
+    """
     signals = []
     try:
-        from collectors.institutional_collector import fetch_research_visits
-        data = fetch_research_visits(days=7)
+        from collectors.institutional_collector import fetch_block_trades
+        data = fetch_block_trades(days=3)
+        if not data:
+            return signals
 
-        # 按标的分组统计
+        # 按股票聚合
         by_code = {}
-        for item in data or []:
+        for item in data:
             code = item.get("code", "")
+            buyer = item.get("buyer", "")
+            premium = item.get("premium", 0)
+            amount = item.get("amount", 0)
+
+            # 机构专用买入 + (溢价>5% 或 金额>5000万)
+            is_institutional = "机构" in buyer
+            is_premium = premium > 0.05
+            is_large = amount > 50000000
+
+            if not is_institutional:
+                continue
+            if not (is_premium or is_large):
+                continue
+
             if code not in by_code:
                 by_code[code] = []
             by_code[code].append(item)
 
-        for code, visits in by_code.items():
-            if len(visits) >= 5:
-                name, sector = config.WATCHLIST.get(code, (code, ""))
-                signals.append(Signal(
-                    source=SignalSource.CAPITAL,
-                    type_="research_cluster",
-                    target_stocks=[code],
-                    target_sectors=[sector] if sector else [],
-                    direction=Direction.BULLISH,
-                    severity=Severity.S3_MEDIUM,
-                    description=(f"{name}({code})7天内获{len(visits)}家机构密集调研，"
-                               f"关注度异常升高"),
-                    raw_data={"code": code, "visit_count": len(visits),
-                              "visits": visits[:10]},
-                    lead_time_days=7,
-                    confidence=0.5,
-                    strength=50,
-                ))
-    except Exception:
-        pass
+        for code, items in by_code.items():
+            total_amount = sum(i["amount"] for i in items)
+            avg_premium = sum(i["premium"] for i in items) / len(items)
+            name = items[0]["name"]
+            in_watchlist = code in _WATCHLIST_CODES
+            _, sector = config.WATCHLIST.get(code, (name, ""))
+
+            signals.append(Signal(
+                source=SignalSource.CAPITAL,
+                type_="block_trade_institutional",
+                target_stocks=[code],
+                target_sectors=[sector] if sector else [],
+                direction=Direction.BULLISH,
+                severity=Severity.S3_MEDIUM,
+                description=(f"大宗交易机构买入{name}({code}) "
+                           f"{total_amount/1e8:.2f}亿"
+                           f"{' 溢价' + str(round(avg_premium*100,1)) + '%' if avg_premium > 0 else ''}"
+                           f"{' ★监控标的' if in_watchlist else ''}"),
+                raw_data={
+                    "code": code, "name": name,
+                    "total_amount": total_amount,
+                    "avg_premium": round(avg_premium, 4),
+                    "entries": len(items),
+                    "in_watchlist": in_watchlist,
+                },
+                lead_time_days=3,
+                confidence=0.5 if in_watchlist else 0.4,
+                strength=50,
+            ))
+
+    except Exception as e:
+        print(f"  [ERROR] 大宗交易检测: {e}")
 
     return signals
 
@@ -256,4 +243,4 @@ if __name__ == "__main__":
     signals = detect_capital_signals()
     print(f"资金异动检测器产生 {len(signals)} 个信号:")
     for s in signals:
-        print(f"  {s.severity} | {s.type} | {s.description} | conf={s.confidence}")
+        print(f"  {s.severity} | {s.type} | {s.description}")
