@@ -216,6 +216,44 @@ def api_materials():
     return jsonify(materials)
 
 
+@app.route("/api/inventory/history")
+def api_inventory_history():
+    """库存历史数据（按品种分组）"""
+    from db import init_db, get_conn
+    init_db()
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM inventory ORDER BY date ASC").fetchall()
+    conn.close()
+    result = {}
+    for r in rows:
+        d = dict(r)
+        commodity = d["commodity"]
+        if commodity not in result:
+            result[commodity] = []
+        result[commodity].append(d)
+    return jsonify(result)
+
+
+@app.route("/api/materials/history")
+def api_materials_history():
+    """材料价格历史（按品种分组）"""
+    from db import init_db, get_conn
+    init_db()
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM material_prices ORDER BY timestamp ASC").fetchall()
+    conn.close()
+    result = {}
+    for r in rows:
+        d = dict(r)
+        material = d["material"]
+        if material not in result:
+            result[material] = []
+        # 只保留日期部分
+        d["date"] = d["timestamp"][:10]
+        result[material].append(d)
+    return jsonify(result)
+
+
 @app.route("/api/news/summary")
 def api_news_summary():
     """AI研判总结"""

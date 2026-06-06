@@ -9,92 +9,60 @@
     <div class="container">
       <h1 style="font-size:20px; font-weight:700; margin:0;">市场全景</h1>
       <div class="text-sm text-muted" style="margin-top:4px;">
-        先行指标面板 · 资金/库存/商品/海外联动
+        先行指标面板 · 库存/商品/资金/海外联动
       </div>
     </div>
   </section>
 
-  <!-- Overseas Mapping -->
+  <!-- Inventory Trend Chart -->
   <section style="padding:0 0 16px;">
     <div class="container">
       <div class="card">
         <div class="card__header">
-          <div class="card__title"><div class="card__title-icon" style="background:var(--accent);"></div>海外龙头映射</div>
-          <div class="card__subtitle">美股AI龙头 → A股关联板块</div>
+          <div class="card__title"><div class="card__title-icon" style="background:var(--warning);"></div>库存趋势（近3个月）</div>
+          <div class="card__subtitle">SHFE库存 · 供给先行指标 · 库存下降→价格上涨压力</div>
         </div>
         <div class="card__body card__body--flush">
-          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:1px; background:var(--border);">
-            <template x-for="s in overseas" :key="s.symbol">
-              <div style="padding:14px; background:var(--bg-secondary); display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                  <div style="font-weight:600; font-size:13px;" x-text="s.name"></div>
-                  <div class="text-xs text-muted" x-text="s.symbol"></div>
-                  <div class="text-xs" style="color:var(--accent); margin-top:2px;" x-text="(s.affects||[]).join(' / ')"></div>
-                </div>
-                <div style="text-align:right;">
-                  <div class="mono" :class="(s.change_pct||0) >= 0 ? 'text-up' : 'text-down'"
-                       x-text="((s.change_pct||0) >= 0 ? '+' : '') + (s.change_pct||0).toFixed(1) + '%'"></div>
-                  <div class="text-xs text-muted mono" x-text="'$' + (s.close||0).toFixed(2)"></div>
-                </div>
-              </div>
-            </template>
-          </div>
+          <div id="inventory-chart" style="width:100%; height:320px;"></div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Two-column: Inventory + Capital -->
+  <!-- Material Price Chart -->
+  <section style="padding:0 0 16px;">
+    <div class="container">
+      <div class="card">
+        <div class="card__header">
+          <div class="card__title"><div class="card__title-icon" style="background:#f59e0b;"></div>商品期货价格（近3个月）</div>
+          <div class="card__subtitle">铜/锡/镍/铝 · 价格传导到A股有1-3天时滞</div>
+        </div>
+        <div class="card__body card__body--flush">
+          <div id="price-chart" style="width:100%; height:320px;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Capital + Overseas -->
   <section style="padding:0 0 16px;">
     <div class="container">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
 
-        <!-- Inventory Panel -->
-        <div class="card">
-          <div class="card__header">
-            <div class="card__title"><div class="card__title-icon" style="background:var(--warning);"></div>库存监控</div>
-            <div class="card__subtitle">SHFE/LME库存 · 供需先行指标</div>
-          </div>
-          <div class="card__body">
-            <template x-for="item in inventory_list" :key="item.name">
-              <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border);">
-                <div>
-                  <div style="font-weight:600; font-size:13px;" x-text="item.name"></div>
-                  <div class="text-xs text-muted" x-text="item.source"></div>
-                </div>
-                <div style="text-align:right;">
-                  <div class="mono" x-text="item.stockpile ? item.stockpile.toLocaleString() + ' 吨' : 'N/A'"></div>
-                  <div class="text-xs mono" :class="item.trend === 'declining' ? 'text-up' : item.trend === 'rising' ? 'text-down' : 'text-muted'"
-                       x-text="item.trend === 'declining' ? '↓ 持续下降' : item.trend === 'rising' ? '↑ 持续上升' : '→ 震荡'"></div>
-                </div>
-              </div>
-            </template>
-            <div x-show="inventory_list.length === 0" class="text-sm text-muted" style="padding:16px; text-align:center;">
-              暂无库存数据（需运行采集或手动录入）
-            </div>
-          </div>
-        </div>
-
-        <!-- Capital Flow Panel -->
+        <!-- Capital Flow -->
         <div class="card">
           <div class="card__header">
             <div class="card__title"><div class="card__title-icon" style="background:var(--up);"></div>资金流向</div>
-            <div class="card__subtitle">北向/融资/机构 · 聪明钱动向</div>
+            <div class="card__subtitle">龙虎榜/融资/大宗 · 聪明钱动向</div>
           </div>
           <div class="card__body">
-            <!-- Northbound -->
             <div style="padding:10px 0; border-bottom:1px solid var(--border);">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div style="font-weight:600; font-size:13px;">北向资金净流入</div>
                 <div class="mono" :class="(northbound.total_net_yi||0) >= 0 ? 'text-up' : 'text-down'"
                      x-text="(northbound.total_net_yi||0).toFixed(1) + ' 亿'"></div>
               </div>
-              <div class="text-xs text-muted" style="margin-top:4px;">
-                沪 <span x-text="((northbound.hgt_net||0)/10000).toFixed(1)"></span>亿 ·
-                深 <span x-text="((northbound.sgt_net||0)/10000).toFixed(1)"></span>亿
-              </div>
             </div>
-            <!-- Capital signals -->
             <template x-for="sig in capital_signals" :key="sig.id">
               <div style="padding:8px 0; border-bottom:1px solid var(--border);">
                 <div style="font-size:12px; font-weight:500;" x-text="sig.description"></div>
@@ -106,48 +74,39 @@
               </div>
             </template>
             <div x-show="capital_signals.length === 0" class="text-sm text-muted" style="padding:16px; text-align:center;">
-              暂无资金异动信号
+              暂无资金异动信号（交易日自动采集）
             </div>
           </div>
         </div>
 
-      </div>
-    </div>
-  </section>
-
-  <!-- Materials / Commodity Panel -->
-  <section style="padding:0 0 16px;">
-    <div class="container">
-      <div class="card">
-        <div class="card__header">
-          <div class="card__title"><div class="card__title-icon" style="background:#f59e0b;"></div>商品期货联动</div>
-          <div class="card__subtitle">铜/锡/镍/铝 · 价格变化传导至A股有1-3天时滞</div>
-        </div>
-        <div class="card__body card__body--flush">
-          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:1px; background:var(--border);">
-            <template x-for="m in materials" :key="m.material">
-              <div style="padding:14px; background:var(--bg-secondary);">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <div style="font-weight:600;" x-text="m.material_name || m.material"></div>
-                  <div class="mono" :class="(m.change_pct||0) >= 0 ? 'text-up' : 'text-down'"
-                       x-text="((m.change_pct||0) >= 0 ? '+' : '') + (m.change_pct||0).toFixed(2) + '%'"></div>
+        <!-- Overseas -->
+        <div class="card">
+          <div class="card__header">
+            <div class="card__title"><div class="card__title-icon" style="background:var(--accent);"></div>海外龙头映射</div>
+            <div class="card__subtitle">美股AI龙头 → A股关联板块</div>
+          </div>
+          <div class="card__body card__body--flush">
+            <template x-for="s in overseas" :key="s.symbol">
+              <div style="padding:12px 14px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <div style="font-weight:600; font-size:13px;" x-text="s.name"></div>
+                  <div class="text-xs" style="color:var(--accent);" x-text="(s.affects||[]).join(' / ')"></div>
                 </div>
-                <div style="display:flex; justify-content:space-between; margin-top:4px;">
-                  <span class="text-xs text-muted" x-text="(m.price||0).toFixed(0) + ' ' + (m.unit||'')"></span>
-                  <span class="text-xs" style="color:var(--accent);" x-text="m.chain || ''"></span>
+                <div style="text-align:right;">
+                  <div class="mono" :class="(s.change_pct||0) >= 0 ? 'text-up' : 'text-down'"
+                       x-text="((s.change_pct||0) >= 0 ? '+' : '') + (s.change_pct||0).toFixed(1) + '%'"></div>
+                  <div class="text-xs text-muted mono" x-text="'$' + (s.close||0).toFixed(2)"></div>
                 </div>
               </div>
             </template>
           </div>
-          <div x-show="materials.length === 0" class="text-sm text-muted" style="padding:20px; text-align:center;">
-            暂无商品数据（需运行材料采集）
-          </div>
         </div>
+
       </div>
     </div>
   </section>
 
-  <!-- Chain Flow (from old index) -->
+  <!-- Chain Flow -->
   <section style="padding:0 0 24px;">
     <div class="container">
       <div class="card">
@@ -173,15 +132,18 @@
             <div class="flow-arrow"><i class="fa-solid fa-arrow-right"></i></div>
             <div class="flow-col">
               <div class="flow-col__title">上游指标</div>
-              <template x-for="item in inventory_list.slice(0,3)" :key="item.name">
-                <div class="flow-node">
-                  <div>
-                    <div class="flow-node__name" x-text="item.name"></div>
-                    <div class="flow-node__affects" x-text="item.trend === 'declining' ? '库存下降→价格上涨压力' : ''"></div>
-                  </div>
-                  <div class="flow-node__val" x-text="item.stockpile ? item.stockpile.toLocaleString() + '吨' : 'N/A'"></div>
-                </div>
-              </template>
+              <div class="flow-node">
+                <div><div class="flow-node__name">SHFE锡库存</div><div class="flow-node__affects">焊接/封装材料</div></div>
+                <div class="flow-node__val text-up" x-text="inventoryLatest('tin')"></div>
+              </div>
+              <div class="flow-node">
+                <div><div class="flow-node__name">SHFE铜库存</div><div class="flow-node__affects">PCB/铜缆材料</div></div>
+                <div class="flow-node__val text-up" x-text="inventoryLatest('copper')"></div>
+              </div>
+              <div class="flow-node">
+                <div><div class="flow-node__name">沪铜期货</div><div class="flow-node__affects">成本传导</div></div>
+                <div class="flow-node__val" x-text="materialLatest('copper')"></div>
+              </div>
             </div>
             <div class="flow-arrow"><i class="fa-solid fa-arrow-right"></i></div>
             <div class="flow-col">
@@ -214,40 +176,130 @@ function market() {
     overseas: [],
     sectors: {},
     northbound: {},
-    inventory_list: [],
     capital_signals: [],
-    materials: [],
+    inventoryData: {},
+    materialData: {},
 
     async load() {
       try {
-        const [dashRes, sigRes, matRes] = await Promise.all([
+        const [dashRes, sigRes, invRes, matRes] = await Promise.all([
           fetch('/api/dashboard'),
           fetch('/api/signals/v2'),
-          fetch('/api/materials')
+          fetch('/api/inventory/history'),
+          fetch('/api/materials/history')
         ]);
         const d = await dashRes.json();
         const sigData = await sigRes.json();
-        const matData = await matRes.json();
 
         this.overseas = d.overseas || [];
         this.sectors = d.sectors || {};
         this.northbound = d.northbound || {};
+        this.capital_signals = (sigData.signals || []).filter(s => s.source === 'capital').slice(0, 8);
 
-        // Build inventory list from dashboard data
-        const inv = d.inventory || {};
-        this.inventory_list = [];
-        if (inv.tin) this.inventory_list.push({name:'SHFE锡库存', source:'上期所', ...inv.tin});
-        if (inv.copper) this.inventory_list.push({name:'SHFE铜库存', source:'上期所', ...inv.copper});
+        this.inventoryData = await invRes.json();
+        this.materialData = await matRes.json();
 
-        // Filter capital signals
-        this.capital_signals = (sigData.signals || []).filter(s => s.source === 'capital');
-
-        // Materials
-        this.materials = matData || [];
-
+        this.$nextTick(() => {
+          this.renderInventoryChart();
+          this.renderPriceChart();
+        });
       } catch (e) {
         console.error('Market load error:', e);
       }
+    },
+
+    inventoryLatest(commodity) {
+      const d = this.inventoryData[commodity];
+      if (d && d.length > 0) return d[d.length-1].stockpile.toLocaleString() + '吨';
+      return 'N/A';
+    },
+
+    materialLatest(material) {
+      const d = this.materialData[material];
+      if (d && d.length > 0) return d[d.length-1].price.toLocaleString() + '元';
+      return 'N/A';
+    },
+
+    renderInventoryChart() {
+      const el = document.getElementById('inventory-chart');
+      if (!el) return;
+      const chart = echarts.init(el);
+      const names = {tin:'锡', copper:'铜', nickel:'镍', aluminum:'铝'};
+      const colors = ['#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6'];
+
+      const series = [];
+      Object.entries(this.inventoryData).forEach(([commodity, data], i) => {
+        if (!data || data.length === 0) return;
+        series.push({
+          name: names[commodity] || commodity,
+          type: 'line',
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 4,
+          lineStyle: { width: 2 },
+          data: data.map(d => [d.date, d.stockpile]),
+        });
+      });
+
+      chart.setOption({
+        backgroundColor: 'transparent',
+        color: colors,
+        tooltip: { trigger: 'axis', formatter: params => {
+          let html = params[0].axisValue + '<br/>';
+          params.forEach(p => {
+            html += `<span style="color:${p.color}">●</span> ${p.seriesName}: <b>${p.value[1].toLocaleString()}</b> 吨<br/>`;
+          });
+          return html;
+        }},
+        legend: { top: 10, textStyle: { color: '#94a3b8', fontSize: 11 } },
+        grid: { left: 60, right: 20, top: 40, bottom: 30 },
+        xAxis: { type: 'category', axisLabel: { color: '#64748b', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
+        yAxis: { type: 'value', axisLabel: { color: '#64748b', fontSize: 10, formatter: v => (v/1000).toFixed(0) + 'k' }, splitLine: { lineStyle: { color: '#1e293b' } } },
+        series: series,
+      });
+      window.addEventListener('resize', () => chart.resize());
+    },
+
+    renderPriceChart() {
+      const el = document.getElementById('price-chart');
+      if (!el) return;
+      const chart = echarts.init(el);
+      const names = {copper:'铜', tin:'锡', nickel:'镍', aluminum:'铝'};
+      const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6'];
+
+      const series = [];
+      Object.entries(this.materialData).forEach(([material, data], i) => {
+        if (!data || data.length === 0) return;
+        series.push({
+          name: names[material] || material,
+          type: 'line',
+          smooth: true,
+          symbol: 'none',
+          lineStyle: { width: 2 },
+          data: data.map(d => [d.date, d.price]),
+        });
+      });
+
+      chart.setOption({
+        backgroundColor: 'transparent',
+        color: colors,
+        tooltip: { trigger: 'axis', formatter: params => {
+          let html = params[0].axisValue + '<br/>';
+          params.forEach(p => {
+            html += `<span style="color:${p.color}">●</span> ${p.seriesName}: <b>${p.value[1].toLocaleString()}</b> 元/吨<br/>`;
+          });
+          return html;
+        }},
+        legend: { top: 10, textStyle: { color: '#94a3b8', fontSize: 11 } },
+        grid: { left: 70, right: 20, top: 40, bottom: 30 },
+        xAxis: { type: 'category', axisLabel: { color: '#64748b', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
+        yAxis: [
+          { type: 'value', name: '铜/铝', axisLabel: { color: '#64748b', fontSize: 10 }, splitLine: { lineStyle: { color: '#1e293b' } } },
+          { type: 'value', name: '锡/镍', position: 'right', axisLabel: { color: '#64748b', fontSize: 10 }, splitLine: { show: false } }
+        ],
+        series: series.map((s, i) => ({ ...s, yAxisIndex: i < 2 ? 0 : 1 })),
+      });
+      window.addEventListener('resize', () => chart.resize());
     }
   };
 }
