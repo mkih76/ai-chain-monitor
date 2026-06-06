@@ -150,7 +150,7 @@ def detect_inventory_signals():
 
 
 def _get_inventory_weekly(commodity, weeks=10):
-    """获取库存周数据（按周聚合）"""
+    """获取库存周数据（取每周最新一条，按真实周聚合）"""
     conn = get_conn()
     rows = conn.execute(
         """SELECT date, stockpile, change, source
@@ -158,18 +158,23 @@ def _get_inventory_weekly(commodity, weeks=10):
            WHERE commodity=?
            ORDER BY date DESC
            LIMIT ?""",
-        (commodity, weeks * 7)  # 最多取weeks*7条日数据
+        (commodity, weeks * 7)
     ).fetchall()
     conn.close()
 
     if not rows:
         return []
 
-    # 按周聚合（取每周最新一条）
+    # 按ISO周聚合（YYYY-Www）
+    from datetime import datetime as dt
     weekly = []
     seen_weeks = set()
     for r in rows:
-        week_key = r["date"][:7] if len(r["date"]) >= 7 else r["date"]  # YYYY-MM
+        try:
+            d = dt.strptime(r["date"], "%Y-%m-%d")
+            week_key = d.strftime("%Y-W%W")  # ISO week
+        except Exception:
+            week_key = r["date"][:7]
         if week_key not in seen_weeks:
             seen_weeks.add(week_key)
             weekly.append(dict(r))
