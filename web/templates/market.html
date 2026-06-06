@@ -14,31 +14,27 @@
     </div>
   </section>
 
-  <!-- Inventory Trend Chart -->
+  <!-- Charts: Inventory + Price side by side -->
   <section style="padding:0 0 16px;">
     <div class="container">
-      <div class="card">
-        <div class="card__header">
-          <div class="card__title"><div class="card__title-icon" style="background:var(--warning);"></div>库存趋势（近3个月）</div>
-          <div class="card__subtitle">SHFE库存 · 供给先行指标 · 库存下降→价格上涨压力</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div class="card">
+          <div class="card__header" style="padding:10px 16px;">
+            <div class="card__title" style="font-size:13px;"><div class="card__title-icon" style="background:var(--warning);"></div>库存趋势</div>
+            <div class="card__subtitle" style="font-size:10px;">SHFE · 库存下降→价格上涨压力</div>
+          </div>
+          <div class="card__body card__body--flush">
+            <div id="inventory-chart" style="width:100%; height:220px;"></div>
+          </div>
         </div>
-        <div class="card__body card__body--flush">
-          <div id="inventory-chart" style="width:100%; height:320px;"></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Material Price Chart -->
-  <section style="padding:0 0 16px;">
-    <div class="container">
-      <div class="card">
-        <div class="card__header">
-          <div class="card__title"><div class="card__title-icon" style="background:#f59e0b;"></div>商品期货价格（近3个月）</div>
-          <div class="card__subtitle">铜/锡/镍/铝 · 价格传导到A股有1-3天时滞</div>
-        </div>
-        <div class="card__body card__body--flush">
-          <div id="price-chart" style="width:100%; height:320px;"></div>
+        <div class="card">
+          <div class="card__header" style="padding:10px 16px;">
+            <div class="card__title" style="font-size:13px;"><div class="card__title-icon" style="background:#f59e0b;"></div>商品期货价格</div>
+            <div class="card__subtitle" style="font-size:10px;">铜/锡/镍/铝 · 传导到A股有1-3天时滞</div>
+          </div>
+          <div class="card__body card__body--flush">
+            <div id="price-chart" style="width:100%; height:220px;"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -252,9 +248,9 @@ function market() {
           return html;
         }},
         legend: { top: 10, textStyle: { color: '#94a3b8', fontSize: 11 } },
-        grid: { left: 60, right: 20, top: 40, bottom: 30 },
-        xAxis: { type: 'category', axisLabel: { color: '#64748b', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
-        yAxis: { type: 'value', axisLabel: { color: '#64748b', fontSize: 10, formatter: v => (v/1000).toFixed(0) + 'k' }, splitLine: { lineStyle: { color: '#1e293b' } } },
+        grid: { left: 50, right: 10, top: 30, bottom: 24 },
+        xAxis: { type: 'category', axisLabel: { color: '#64748b', fontSize: 9 }, axisLine: { lineStyle: { color: '#334155' } } },
+        yAxis: { type: 'value', axisLabel: { color: '#64748b', fontSize: 9, formatter: v => (v/1000).toFixed(0) + 'k' }, splitLine: { lineStyle: { color: '#1e293b' } } },
         series: series,
       });
       window.addEventListener('resize', () => chart.resize());
@@ -291,11 +287,11 @@ function market() {
           return html;
         }},
         legend: { top: 10, textStyle: { color: '#94a3b8', fontSize: 11 } },
-        grid: { left: 70, right: 20, top: 40, bottom: 30 },
-        xAxis: { type: 'category', axisLabel: { color: '#64748b', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
+        grid: { left: 55, right: 45, top: 30, bottom: 24 },
+        xAxis: { type: 'category', axisLabel: { color: '#64748b', fontSize: 9 }, axisLine: { lineStyle: { color: '#334155' } } },
         yAxis: [
-          { type: 'value', name: '铜/铝', axisLabel: { color: '#64748b', fontSize: 10 }, splitLine: { lineStyle: { color: '#1e293b' } } },
-          { type: 'value', name: '锡/镍', position: 'right', axisLabel: { color: '#64748b', fontSize: 10 }, splitLine: { show: false } }
+          { type: 'value', name: '铜/铝', nameTextStyle: {fontSize:9,color:'#64748b'}, axisLabel: { color: '#64748b', fontSize: 9 }, splitLine: { lineStyle: { color: '#1e293b' } } },
+          { type: 'value', name: '锡/镍', position: 'right', nameTextStyle: {fontSize:9,color:'#64748b'}, axisLabel: { color: '#64748b', fontSize: 9 }, splitLine: { show: false } }
         ],
         series: series.map((s, i) => ({ ...s, yAxisIndex: i < 2 ? 0 : 1 })),
       });
