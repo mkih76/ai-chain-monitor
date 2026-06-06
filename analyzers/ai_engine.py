@@ -364,7 +364,7 @@ def _llm_reasoning(quantified, sector_analysis, global_view, risk_alerts):
                 {"role": "system", "content": ANALYST_PROMPT},
                 {"role": "user", "content": user_msg},
             ],
-            "max_tokens": 600,
+            "max_tokens": 1200,
             "temperature": 0.3,
         }
 
