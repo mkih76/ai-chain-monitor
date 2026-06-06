@@ -802,7 +802,93 @@ a:hover { text-decoration: underline; }
   .stock-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* ========== Signal Radar ========== */
+/* ========== Signal Flow Chain ========== */
+
+/* Signal source node */
+.flow-source-node {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; margin-bottom: 8px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 8px; position: relative;
+  transition: all 0.15s;
+}
+.flow-source-node:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.flow-source-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: #fff; flex-shrink: 0;
+}
+.flow-source-badge {
+  position: absolute; top: -6px; right: -6px;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px; background: var(--accent); color: #fff;
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Flow link row */
+.flow-link-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 0; font-size: 11px;
+}
+.flow-link-from {
+  width: 70px; text-align: right; font-weight: 500; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.flow-link-line {
+  height: 2px; border-radius: 1px; min-width: 30px; flex-shrink: 0;
+}
+.flow-link-arrow {
+  font-size: 14px; font-weight: 700; line-height: 1;
+}
+.flow-link-to {
+  font-weight: 600; color: var(--text-primary); min-width: 50px;
+}
+.flow-link-conf {
+  font-size: 10px; font-weight: 700; font-family: var(--font-mono);
+}
+
+/* Sector signal node */
+.flow-sector-node {
+  padding: 10px 14px; margin-bottom: 6px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 8px; border-left: 3px solid var(--border);
+  transition: all 0.15s;
+}
+.flow-sector-node:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.flow-sector--bull { border-left-color: var(--up); }
+.flow-sector--bear { border-left-color: var(--down); }
+.flow-sector--neutral { border-left-color: var(--text-muted); }
+
+/* Direction badge */
+.flow-dir-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 8px;
+  border-radius: 10px; letter-spacing: 0.5px;
+}
+.flow-dir--up { background: rgba(5,150,105,0.1); color: var(--up); }
+.flow-dir--down { background: rgba(220,38,38,0.1); color: var(--down); }
+.flow-dir--flat { background: rgba(100,116,139,0.1); color: var(--text-muted); }
+
+/* Confidence pill */
+.flow-conf-pill {
+  font-size: 13px; font-weight: 700; font-family: var(--font-mono);
+}
+
+/* Source tag */
+.flow-src-tag {
+  font-size: 9px; padding: 2px 6px; border-radius: 4px;
+  background: var(--bg-tertiary); color: var(--text-muted);
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .signal-flow-grid { grid-template-columns: 1fr !important; }
+}
 
 /* Pipeline flow */
 .pipeline-node {
