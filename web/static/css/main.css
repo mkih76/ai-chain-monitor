@@ -802,7 +802,113 @@ a:hover { text-decoration: underline; }
   .stock-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* ========== Signal Flow Chain ========== */
+/* ========== 先行指标仪表盘 ========== */
+.indicator-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+.indicator-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; background: var(--bg-secondary);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.indicator--danger { border-color: var(--down); background: rgba(220,38,38,0.05); }
+.indicator--warning { border-color: var(--warning); }
+.indicator--success { border-color: var(--up); background: rgba(5,150,105,0.05); }
+.indicator--muted { opacity: 0.6; }
+
+.indicator-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.indicator-dot--danger { background: var(--down); box-shadow: 0 0 6px var(--down); }
+.indicator-dot--warning { background: var(--warning); }
+.indicator-dot--success { background: var(--up); }
+.indicator-dot--muted { background: var(--text-muted); }
+
+.indicator-right { margin-left: auto; text-align: right; }
+
+/* ========== 市场表格 ========== */
+.market-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 12px;
+}
+.market-table th {
+  text-align: left; padding: 6px 12px;
+  font-size: 10px; font-weight: 600;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+}
+.market-table td {
+  padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.market-table tr:last-child td { border-bottom: none; }
+.market-table tr:hover td { background: rgba(255,255,255,0.02); }
+.inst-badge {
+  font-size: 9px; padding: 2px 6px; border-radius: 4px;
+  background: rgba(5,150,105,0.15); color: var(--up);
+  font-weight: 700; letter-spacing: 0.5px;
+}
+
+/* ========== 因果传导链 ========== */
+.causal-chain-list { display: flex; flex-direction: column; gap: 10px; }
+
+.causal-chain-item {
+  display: grid;
+  grid-template-columns: 180px 1fr 220px 90px;
+  gap: 0; align-items: center;
+  padding: 12px 16px; background: var(--bg-secondary);
+  border: 1px solid var(--border); border-radius: 10px;
+  border-left: 3px solid var(--border);
+}
+.causal-chain--bull { border-left-color: var(--up); }
+.causal-chain--bear { border-left-color: var(--down); }
+
+.causal-driver { display: flex; align-items: center; gap: 10px; }
+.causal-driver-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: #fff; flex-shrink: 0;
+}
+
+.causal-arrow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 16px;
+}
+.causal-line { height: 2px; border-radius: 1px; flex-shrink: 0; min-width: 20px; }
+.causal-arrowhead { font-size: 16px; font-weight: 700; line-height: 1; }
+.causal-mechanism {
+  font-size: 11px; color: var(--text-muted); max-width: 200px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.causal-target { }
+.causal-target-name { font-weight: 600; font-size: 13px; }
+
+.causal-conf-badge {
+  font-size: 11px; font-weight: 700; font-family: var(--font-mono);
+}
+.causal-conf--bull { color: var(--up); }
+.causal-conf--bear { color: var(--down); }
+
+.causal-sev-tag {
+  font-size: 9px; padding: 2px 6px; border-radius: 4px;
+  background: var(--bg-tertiary); color: var(--text-muted); font-weight: 600;
+}
+
+.causal-action { text-align: center; }
+.causal-action-badge {
+  display: inline-block; padding: 4px 14px; border-radius: 12px;
+  font-size: 11px; font-weight: 700;
+}
+.causal-action--bull { background: rgba(5,150,105,0.15); color: var(--up); }
+.causal-action--bear { background: rgba(220,38,38,0.15); color: var(--down); }
+
+@media (max-width: 900px) {
+  .causal-chain-item { grid-template-columns: 1fr; gap: 8px; }
+  .indicator-grid { grid-template-columns: repeat(2, 1fr); }
+  .market-table { font-size: 11px; }
+}
 
 /* Signal source node */
 .flow-source-node {
