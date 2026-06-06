@@ -15,6 +15,7 @@ from detectors.inventory_detector import detect_inventory_signals
 from detectors.capital_detector import detect_capital_signals
 from detectors.commodity_detector import detect_commodity_signals
 from detectors.overseas_detector import detect_overseas_signals
+from detectors.announcement_detector import detect_announcement_signals
 from analyzers.correlator import run_correlation
 from datetime import datetime
 
@@ -68,6 +69,15 @@ def run_all_detectors():
         all_signals.extend(os_signals)
     except Exception as e:
         log(f"  ⚠ 海外检测异常: {e}")
+
+    # M6 公告雷达检测
+    log("M6 · 公告雷达检测...")
+    try:
+        ann_signals = detect_announcement_signals()
+        log(f"  → {len(ann_signals)} 个信号")
+        all_signals.extend(ann_signals)
+    except Exception as e:
+        log(f"  ⚠ 公告检测异常: {e}")
 
     log(f"\n原始信号合计: {len(all_signals)} 个")
 
@@ -127,9 +137,9 @@ if __name__ == "__main__":
             # 测试模式：运行但不保存
             signals = run_all_detectors()
             print(f"\n测试完成，共 {len(signals)} 个信号")
-        elif cmd in ("inventory", "capital", "commodity", "overseas"):
+        if cmd in ("inventory", "capital", "commodity", "overseas", "announcement"):
             run_single(cmd)
         else:
-            print(f"用法: python detect_runner.py [inventory|capital|commodity|overseas|test]")
+            print(f"用法: python detect_runner.py [inventory|capital|commodity|overseas|announcement|test]")
     else:
         run_all_detectors()

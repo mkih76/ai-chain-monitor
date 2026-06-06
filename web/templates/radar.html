@@ -22,6 +22,11 @@
             <i class="fa-solid fa-rotate" :class="{'fa-spin': detecting}"></i>
             <span x-text="detecting ? '检测中...' : '运行检测'"></span>
           </button>
+          <button @click="runVerify()" class="btn" :disabled="verifying"
+                  style="font-size:11px; padding:6px 14px; border:1px solid var(--border);">
+            <i class="fa-solid fa-check-double"></i>
+            <span x-text="verifying ? '验证中...' : '验证信号'"></span>
+          </button>
         </div>
       </div>
 
@@ -93,6 +98,52 @@
           <div class="stat-card__value" :class="stats.accuracy > 60 ? 'text-up' : 'text-down'"
                x-text="stats.accuracy ? stats.accuracy + '%' : '—'"></div>
           <div class="stat-card__label">准确率</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI Report Summary -->
+  <section style="padding: 0 0 12px;" x-show="report">
+    <div class="container">
+      <div class="card" style="border-left:3px solid var(--accent);">
+        <div class="card__body" style="padding:14px 18px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="font-size:18px;"><i class="fa-solid fa-brain" style="color:var(--accent);"></i></div>
+            <div style="flex:1;">
+              <div style="font-weight:600; font-size:14px;" x-text="report?.summary || ''"></div>
+              <div style="display:flex; gap:16px; margin-top:4px; font-size:11px; color:var(--text-muted);">
+                <span>分析 <span x-text="report?.signals_reviewed || 0"></span> 个信号</span>
+                <span>偏多 <span class="text-up" x-text="report?.bullish_sectors || 0"></span> 板块</span>
+                <span>偏空 <span class="text-down" x-text="report?.bearish_sectors || 0"></span> 板块</span>
+              </div>
+            </div>
+            <div class="badge" :class="report?.action === 'watch_bearish' ? 'badge--down' : report?.action === 'watch_bullish' ? 'badge--up' : 'badge--muted'"
+                 x-text="report?.action === 'watch_bearish' ? '防守为主' : report?.action === 'watch_bullish' ? '关注多头' : '观望'">
+            </div>
+          </div>
+          <!-- Top Call -->
+          <template x-if="report?.top_calls?.length > 0">
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px;">重点关注</div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <template x-for="call in report.top_calls.slice(0, 4)" :key="call.sector">
+                  <span class="badge" :class="call.direction === 'bearish' ? 'badge--down' : 'badge--up'"
+                        x-text="call.sector + ' ' + (call.direction === 'bearish' ? '↓' : '↑') + ' ' + Math.round(call.confidence * 100) + '%'">
+                  </span>
+                </template>
+              </div>
+            </div>
+          </template>
+          <!-- Risk Alerts -->
+          <template x-if="report?.risk_alerts?.length > 0">
+            <div style="margin-top:8px;">
+              <div style="font-size:11px; color:var(--warning);">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span x-text="report.risk_alerts.length + ' 条风险提示'"></span>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -226,16 +277,22 @@ function radar() {
   return {
     signals: [],
     stats: {},
+    report: null,
     filter: 'all',
     detecting: false,
+    verifying: false,
     lastUpdate: '',
 
     async load() {
       try {
-        const res = await fetch('/api/signals/v2');
-        const data = await res.json();
-        this.signals = data.signals || [];
-        this.stats = data.stats || {};
+        const [sigRes, reportRes] = await Promise.all([
+          fetch('/api/signals/v2'),
+          fetch('/api/report')
+        ]);
+        const sigData = await sigRes.json();
+        this.signals = sigData.signals || [];
+        this.stats = sigData.stats || {};
+        this.report = await reportRes.json();
         this.lastUpdate = new Date().toLocaleString('zh-CN');
       } catch (e) {
         console.error('Load error:', e);
@@ -265,12 +322,26 @@ function radar() {
       try {
         const res = await fetch('/api/signals/v2/run-detect', { method: 'POST' });
         const data = await res.json();
-        // Reload signals
         await this.load();
       } catch (e) {
         console.error('Detect error:', e);
       }
       this.detecting = false;
+    },
+
+    async runVerify() {
+      this.verifying = true;
+      try {
+        const res = await fetch('/api/verify', { method: 'POST' });
+        const data = await res.json();
+        // 更新统计
+        await this.load();
+        const msg = `验证完成: ${data.verified}正确, ${data.invalidated}错误, ${data.expired}过期`;
+        alert(msg);
+      } catch (e) {
+        console.error('Verify error:', e);
+      }
+      this.verifying = false;
     }
   };
 }

@@ -306,6 +306,37 @@ def radar_page():
     """信号雷达页面"""
     return render_template("radar.html")
 
+
+@app.route("/api/report")
+def api_report():
+    """AI研判报告"""
+    from analyzers.ai_engine import generate_signal_report
+    report = generate_signal_report()
+    return jsonify(report)
+
+
+@app.route("/api/verify", methods=["POST"])
+def api_verify():
+    """运行信号验证"""
+    from verifier import verify_signals, get_accuracy_by_source, get_accuracy_by_severity
+    results = verify_signals()
+    results["by_source"] = get_accuracy_by_source()
+    results["by_severity"] = get_accuracy_by_severity()
+    return jsonify(results)
+
+
+@app.route("/api/verify/stats")
+def api_verify_stats():
+    """验证统计"""
+    from verifier import (get_accuracy_by_source, get_accuracy_by_type,
+                          get_accuracy_by_severity, get_recent_verifications)
+    return jsonify({
+        "by_source": get_accuracy_by_source(),
+        "by_type": get_accuracy_by_type(),
+        "by_severity": get_accuracy_by_severity(),
+        "recent": get_recent_verifications(20),
+    })
+
 @app.route("/api/ai-analysis")
 def api_ai_analysis():
     """AI分析结果"""
