@@ -61,8 +61,8 @@ def detect_commodity_signals():
         if price <= 0:
             continue
 
-        # --- 信号1: 单日异动(>3%) ---
-        if abs(change_pct) > 3:
+        # --- 信号1: 单日异动(>1.5%) ---
+        if abs(change_pct) > 1.5:
             direction = Direction.BULLISH if change_pct > 0 else Direction.BEARISH
             target = (chain["stocks_benefit"] if change_pct > 0
                       else chain["stocks_pressure"])

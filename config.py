@@ -4,6 +4,13 @@ AI产业链监控系统 - 配置文件
 """
 import os
 
+# 加载 .env 文件（本地开发用，生产环境用系统环境变量）
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+except ImportError:
+    pass
+
 # === 监控标的 ===
 # 格式: (代码, 名称, 板块分类)
 WATCHLIST = {
@@ -105,10 +112,10 @@ CLS_TELEGRAPH = {
 # === AI分析引擎配置 ===
 AI_ENGINE = {
     "enabled": True,
-    # OpenAI兼容API (zyapi)
+    # OpenAI兼容API (zyapi) — 通过环境变量配置，不要硬编码key
     "api_base": os.environ.get("AI_API_BASE", "https://zyapi.tuluo.top:8888/v1"),
-    "api_key": os.environ.get("AI_API_KEY", "pk_ZN0d6CR4JrWU1hz5RralZEKr6RarK9YFSsZ1F_F9ILg"),
-    "model": os.environ.get("AI_MODEL", "deepseek-v4-pro"),
+    "api_key": os.environ.get("AI_API_KEY", ""),
+    "model": os.environ.get("AI_MODEL", "MiniMax-M2.7"),
     # MiMo LLM Proxy (VPS本地, 可选)
     "mimo_proxy_url": os.environ.get("MIMO_PROXY_URL", "http://localhost:3001/open-apis/bot/chat"),
     "mimo_service_token": os.environ.get("MIMO_SERVICE_TOKEN", ""),
