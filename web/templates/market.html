@@ -184,6 +184,9 @@
 
 {% block scripts %}
 <script>
+// 服务端预渲染的因果链数据
+window.__causalChains = {{ causal_chains | tojson | safe }};
+
 function market() {
   return {
     overseas: [],
@@ -250,18 +253,8 @@ function market() {
     },
 
     async _loadCausalChains(signals) {
-      try {
-        const ctrl = new AbortController();
-        const to = setTimeout(() => ctrl.abort(), 10000);
-        const r = await fetch('/api/causal-chains', {signal: ctrl.signal});
-        clearTimeout(to);
-        if (r.ok) {
-          const chains = await r.json();
-          this.causalChains = Array.isArray(chains) ? chains : [];
-        }
-      } catch(e) {
-        // 因果链加载失败不影响主流程
-      }
+      // 因果链：服务端预渲染，直接读取，无网络延迟
+      this.causalChains = window.__causalChains || [];
     },
 
     buildSourceStatus(signals, d) {

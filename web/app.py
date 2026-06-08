@@ -26,8 +26,10 @@ def signal_page():
 
 @app.route("/market")
 def market_page():
-    """②市场 — 先行指标全景"""
-    return render_template("market.html")
+    """市场全景页面"""
+    from analyzers.causal_chain import generate_causal_chains
+    chains = generate_causal_chains()
+    return render_template("market.html", causal_chains=chains)
 
 @app.route("/report")
 def report_page():
